@@ -1,0 +1,2 @@
+# The latest test harness pins 2026.9.0; exercise the current stable patch.
+homeassistant==2026.9.1

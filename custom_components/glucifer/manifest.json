@@ -1,0 +1,13 @@
+{
+  "domain": "glucifer",
+  "name": "Glucifer HA",
+  "codeowners": ["@pannal"],
+  "config_flow": true,
+  "dependencies": ["webhook"],
+  "documentation": "https://github.com/pannal/glucifer-HA",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/pannal/glucifer-HA/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

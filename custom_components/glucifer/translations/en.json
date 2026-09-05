@@ -1,0 +1,37 @@
+{
+  "title": "Glucifer HA",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a JugglucoNG sender",
+        "description": "Choose a name for this sender. Each phone needs its own receiver entry.",
+        "data": {
+          "name": "Name"
+        }
+      },
+      "receiver": {
+        "title": "Connect JugglucoNG",
+        "description": "Save this receiver, then paste the following URL into a Glucifer HA API destination in JugglucoNG:\n\n`{url}`\n\nIf only a path is shown, prefix it with your Home Assistant URL. Keep the full URL private. Remote access requires a reachable HTTPS endpoint or VPN and local-only reception turned off.",
+        "data": {
+          "local_only": "Accept local requests only",
+          "stale_seconds": "Mark data unavailable after (seconds)"
+        }
+      }
+    },
+    "error": {
+      "name_required": "Enter a name."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Receiver settings",
+        "description": "Receiver URL (keep private):\n\n`{url}`\n\nIf only a path is shown, prefix it with your Home Assistant URL. Field selection is configured in the JugglucoNG sender. Removing this integration revokes its URL.",
+        "data": {
+          "local_only": "Accept local requests only",
+          "stale_seconds": "Mark data unavailable after (seconds)"
+        }
+      }
+    }
+  }
+}

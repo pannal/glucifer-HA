@@ -1,0 +1,13 @@
+Glucifer HA
+Copyright (C) 2026 pannal and contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+This project is distributed under the GNU General Public License, version 3
+or any later version. The full license text is in LICENSE.
+
+The bundled icon, custom_components/glucifer/brand/icon.png, is an unmodified
+copy of Common/src/main/ic_launcher-playstore.png from JugglucoNG, commit
+058374ab296dde8001f43b267173ac55b268a79e. Its existing copyrights and the
+JugglucoNG project's GPL license are retained.
+
+Source: https://github.com/ctqvva/JugglucoNG
