@@ -119,6 +119,10 @@ the file's GitHub URL. Both support quiet hours and a cooldown.
 
 </details>
 
+## Donations
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Z8Z8X6P9T)
+
 ## Development disclosure
 
 This project is developed with AI assistance, guided by a software developer
