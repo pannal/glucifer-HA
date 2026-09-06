@@ -37,7 +37,7 @@ container, add-on, or listening port.
 ### HACS custom repository
 
 1. Open HACS, then its menu and **Custom repositories**.
-2. Add `https://github.com/pannal/glucifer-HA` with type **Integration**.
+2. Add `https://github.com/pannal/glucifer-ha` with type **Integration**.
 3. Enable pre-release versions in HACS if selecting an alpha release, download
    **Glucifer HA**, and restart Home Assistant.
 

@@ -20,7 +20,7 @@ yet. Live phone-to-Home-Assistant testing is still pending.
 ## Quick setup
 
 1. In **HACS > Custom repositories**, add
-   `https://github.com/pannal/glucifer-HA` as an **Integration**. Enable
+   `https://github.com/pannal/glucifer-ha` as an **Integration**. Enable
    pre-release versions, download Glucifer HA, and restart Home Assistant.
 2. Open **Settings > Devices & services > Add integration > Glucifer HA**.
    Name the phone, choose your glucose unit, and finish receiver setup.
@@ -116,7 +116,7 @@ the file's GitHub URL. Both support quiet hours and a cooldown.
 
 [Full guide](docs/guide.md) · [Protocol](docs/protocol.md) ·
 [Development](docs/guide.md#development) ·
-[Releases](https://github.com/pannal/glucifer-HA/releases)
+[Releases](https://github.com/pannal/glucifer-ha/releases)
 
 Licensed under [GPL-3.0-or-later](LICENSE), matching JugglucoNG.
 Copyright (C) 2026 pannal and contributors. Reused assets retain their
