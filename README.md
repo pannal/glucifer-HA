@@ -32,10 +32,10 @@ JugglucoNG build noted above.
    then turn it on. HACS creates this switch after downloading and restarting;
    you do not need to connect a phone first.
 3. In HA, open **Settings > Devices & services > Add integration > Glucifer HA**.
-   Name the phone, choose your glucose unit, and submit to activate the connection.
-4. **Get the connection details:** select **Configure** for that phone in HA.
-   It shows a connection URL and QR code. The connection is already active;
-   no further save in HA is needed unless you change its settings.
+   Name the phone, choose your glucose unit, and select **Submit**.
+4. **Pair the phone:** HA continues directly to the QR code and connection URL.
+   The connection is already active. You can reopen these details later through
+   **Configure** for that phone; no further submit is needed unless you change settings.
 5. In JugglucoNG, open **API destinations** and add a **Glucifer HA** destination.
    **Manual:** copy the connection URL from HA and paste it into **POST URL**.
    **QR:** tap **Scan QR Code**, scan from another screen, and confirm the HA host.

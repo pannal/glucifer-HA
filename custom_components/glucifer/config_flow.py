@@ -74,6 +74,12 @@ class JugglucoFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=schema(),
         )
 
+    async def async_on_create_entry(self, result):
+        """Continue directly to pairing after the webhook has been activated."""
+        pairing = await self.hass.config_entries.options.async_init(result["result"].entry_id)
+        result["next_flow"] = (config_entries.FlowType.OPTIONS_FLOW, pairing["flow_id"])
+        return result
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):

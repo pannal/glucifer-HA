@@ -69,10 +69,10 @@ Restart Home Assistant after copying the files.
 1. In Home Assistant, open **Settings > Devices & services > Add integration**
    and search for **Glucifer HA**.
 2. Name the phone, for example `My phone`.
-3. Submit the settings to activate the connection, then select **Configure**
-   for the phone. This shows its URL and QR code; scanning does not require
-   another save in HA. If only `/api/webhook/...` is shown, prepend your Home Assistant
-   URL and use manual entry.
+3. Select **Submit** to activate the connection. HA continues directly to its
+   URL and QR code; scanning does not require another submit. To reopen the
+   pairing details later, select **Configure** for the phone. If only
+   `/api/webhook/...` is shown, prepend your Home Assistant URL and use manual entry.
 4. In the matching JugglucoNG build, open its **API destinations** settings,
    add a **Glucifer HA** destination. For manual setup, copy the connection URL
    from HA and paste it into **POST URL**. You can do this on the same phone;

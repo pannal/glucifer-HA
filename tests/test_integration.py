@@ -366,7 +366,10 @@ async def test_pairing_accepts_data_without_submitting_options(
     )
     await hass.async_block_till_done()
     assert result["type"] == "create_entry"
-    options = await hass.config_entries.options.async_init(result["result"].entry_id)
+    flow_type, pairing_id = result["next_flow"]
+    assert flow_type == "options_flow"
+    options = await hass.config_entries.options.async_configure(pairing_id)
+    assert options["step_id"] == "init"
     qr = next(v for v in options["data_schema"].schema.values() if isinstance(v, QrCodeSelector))
     assert qr.config["data"] == options["description_placeholders"]["url"]
     url = qr.config["data"] if setup_method == "qr" else options["description_placeholders"]["url"]
@@ -380,6 +383,8 @@ async def test_pairing_accepts_data_without_submitting_options(
     snapshot["sequence"] += 1
     response = await client.post(urlsplit(url).path, json=snapshot)
     assert (await response.json())["status"] == "accepted"
+    reopened = await hass.config_entries.options.async_init(result["result"].entry_id)
+    assert reopened["description_placeholders"]["url"] == url
 
 
 async def test_measurements_round_to_one_decimal(hass, receiver, snapshot):

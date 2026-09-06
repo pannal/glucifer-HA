@@ -11,7 +11,7 @@
       },
       "save_connection": {
         "title": "Activate the phone connection",
-        "description": "Choose your settings and select Submit to activate the connection. Then open Configure for this phone on the Glucifer HA integration page to copy its connection URL or scan its QR code.\n\nTo connect away from home, use a reachable HTTPS address or VPN and leave Accept local requests only turned off.",
+        "description": "Choose your settings and select Submit to activate the connection. The next screen shows its QR code and connection URL for pairing with JugglucoNG. You can reopen them later through Configure for this phone.\n\nTo connect away from home, use a reachable HTTPS address or VPN and leave Accept local requests only turned off.",
         "data": {
           "local_only": "Accept local requests only",
           "stale_seconds": "Mark data unavailable after (seconds)",
