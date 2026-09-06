@@ -34,6 +34,9 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
       - run: python3 -m pip download --no-deps home-assistant-frontend==20260826.6 -d /tmp/glucifer-frontend
       - run: python3 -m zipfile -e /tmp/glucifer-frontend/home_assistant_frontend-20260826.6-py3-none-any.whl /tmp/glucifer-frontend/unpacked
       - run: node tests/frontend/native-check.cjs

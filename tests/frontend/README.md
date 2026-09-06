@@ -3,7 +3,8 @@ fallback rendering, editor controls, localization, subscriptions, and races.
 `native-check.cjs` uses the real chart and ECharts modules from HA 2026.9.1's
 frontend package. It checks canvas clicks, tooltips, gaps, zoom, and updates.
 
-Prepare the official frontend package without installing it into HA:
+Use Python 3.14 or newer to prepare the official frontend package without
+installing it into HA:
 
 ```sh
 python3 -m pip download --no-deps home-assistant-frontend==20260826.6 -d /tmp/glucifer-frontend
