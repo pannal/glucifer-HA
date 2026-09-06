@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // No remote resources; measurements remain within the authenticated HA connection.
+// Wire names match JugglucoNG's optional fields. These switches affect display only.
+const GLUCIFER_FIELDS = {
+  trend: "Trend", delta_mgdl: "Glucose delta (5 min)", rate_mgdl_min: "Rate of change",
+  raw_mgdl: "Raw glucose", auto_mgdl: "Automatically calibrated glucose",
+  iob_u: "Insulin on board", cob_g: "Carbs on board", battery_percent: "Phone battery level",
+  sensor_id: "Sensor identifier", sensor_generation: "Sensor generation",
+  sensor_started_ms: "Started", sensor_expires_ms: "Expected end", sensor_warmup: "Sensor warming up",
+};
+const GLUCIFER_SENSOR_FIELDS = Object.keys(GLUCIFER_FIELDS).filter(key => key.startsWith("sensor_"));
 const GLUCIFER_DEFAULTS = {
+  ...Object.fromEntries(Object.keys(GLUCIFER_FIELDS).map(key => [`show_${key}`, true])),
+  show_reading_age: true, show_glucose_unit: true,
   hours: 24, show_history: true, show_details: true, show_alerts: true, show_lifecycle: true,
   show_journal: false, show_journal_markers: true, journal_days: 7, journal_limit: 25,
   journal_types: ["insulin", "carbs", "note"], color_glucose: true, color_trend: true,
@@ -28,6 +39,9 @@ function gluciferConfig(config) {
   }
   if (!Array.isArray(result.journal_types) || result.journal_types.some(t => !["insulin","carbs","note"].includes(t)))
     throw new Error("Choose insulin, carbohydrates or notes for journal entries.");
+  // Retain old YAML settings while exposing individual fields in the editor.
+  for (const key of GLUCIFER_SENSOR_FIELDS) if (config[`show_${key}`] == null && config.show_lifecycle === false) result[`show_${key}`] = false;
+  for (const key of ["delta_mgdl", "reading_age"]) if (config[`show_${key}`] == null && config.show_details === false) result[`show_${key}`] = false;
   return result;
 }
 const gluciferColor = (config, key) => `rgb(${config[key].join(",")})`;
@@ -45,14 +59,16 @@ function gluciferTrendColor(trend, config) {
 }
 function gluciferForm() {
   const field = (name, label, selector) => ({name, label, selector});
-  const toggle = (name,label) => field(name,label,{boolean:{}});
+  const toggle = (name,label) => ({...field(name,label,{boolean:{}}),default:GLUCIFER_DEFAULTS[name]});
   const number = (name,label,min,max) => field(name,label,{number:{min,max,step:1,mode:"box"}});
   const color = (name,label) => field(name,label,{color_rgb:{}});
   const panel = (name,title,schema) => ({name,type:"expandable",title,flatten:true,schema});
-  return {
+  const form = {
     schema: [field("entity","Glucose entity",{entity:{filter:{domain:"sensor",device_class:"blood_glucose_concentration"}}}),
       field("title","Title",{text:{}}), number("hours","Chart hours",1,168),
-      panel("display","Display",[toggle("show_history","Show glucose chart"),toggle("show_details","Show delta and reading age"),toggle("show_alerts","Show active alerts"),toggle("show_lifecycle","Show sensor details")]),
+      panel("display","Display",[toggle("show_history","Glucose chart"),toggle("show_glucose_unit","Show glucose unit"),toggle("show_reading_age","Reading age"),toggle("show_alerts","Active alerts")]),
+      panel("values","Glucose and phone data",Object.entries(GLUCIFER_FIELDS).filter(([key]) => !key.startsWith("sensor_")).map(([key,label]) => toggle(`show_${key}`,label))),
+      panel("sensor","Sensor data",GLUCIFER_SENSOR_FIELDS.map(key => toggle(`show_${key}`,GLUCIFER_FIELDS[key]))),
       panel("journal","Journal",[toggle("show_journal_markers","Show journal points on chart"),toggle("show_journal","Show journal history list"),
         number("journal_days","Journal history days",1,90),number("journal_limit","Maximum entries in the list",1,200),
         field("journal_types","Journal entry types",{select:{multiple:true,options:[{value:"insulin",label:"Insulin"},{value:"carbs",label:"Carbohydrates"},{value:"note",label:"Notes"}]}})]),
@@ -67,10 +83,18 @@ function gluciferForm() {
       if (schema.name === "journal_days") return "Default 7 days. Limited by journal history enabled in JugglucoNG; this only changes what this card shows.";
       if (schema.name === "journal_limit") return "Default 25 entries, newest first.";
       if (schema.name === "hours") return "Default 24 hours. Glucose history is retained for up to 7 days.";
+      if (schema.name?.startsWith("show_") && GLUCIFER_FIELDS[schema.name.slice(5)]) return "Display this field when enabled in JugglucoNG and available in Home Assistant. This does not change what the phone sends.";
       return undefined;
     },
-    assertConfig: config => { gluciferConfig(config); },
+    assertConfig: config => {
+      const normalized = gluciferConfig(config);
+      // HA uses schema defaults for absent boolean values, including older YAML groups.
+      for (const field of form.schema.flatMap(item => item.schema || [item])) {
+        if (field.selector?.boolean) field.default = normalized[field.name];
+      }
+    },
   };
+  return form;
 }
 
 class GluciferCard extends HTMLElement {
@@ -85,6 +109,11 @@ class GluciferCard extends HTMLElement {
     this.stopSubscription();
     this.config = gluciferConfig(config);
     this.data = null;
+    this.selectedJournalId = null;
+    this.chartSignature = null;
+    this.historySignature = null;
+    this.ageKey = null;
+    this.chartElement?.zoom(0, 100);
     this.updated = 0;
     this.render();
     this.ensureSubscription();
@@ -93,15 +122,27 @@ class GluciferCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     this.ensureSubscription();
-    this.render();
-    this.refresh();
+    if (this.stateSignature() !== this.renderedStates) this.render();
+    this.updateAge();
+    if (!this.data) this.refresh();
+  }
+  stateSignature() {
+    const states = this._hass?.states || {};
+    const entities = this.data?.entities || {};
+    const keys = Object.keys(entities).filter(key =>
+      ["connected", "stale"].includes(key) ||
+      (key.startsWith("alert_") ? this.config?.show_alerts : this.config?.[`show_${key}`] && key !== "reading_age"));
+    return JSON.stringify([this._hass?.locale, this._hass?.config?.time_zone,
+      states[this.config?.entity]?.state, states[this.config?.entity]?.attributes.unit_of_measurement, ...keys.map(key => [key, states[entities[key]]?.state, states[entities[key]]?.attributes])]);
   }
   connectedCallback() {
     this.ensureSubscription();
+    this.ageTimer = setInterval(() => this.updateAge(), 1000);
     this.timer = setInterval(() => { this.ensureSubscription(); this.refresh(); }, 60000);
     this.refresh();
+    this.loadChart();
   }
-  disconnectedCallback() { clearInterval(this.timer); this.stopSubscription(); }
+  disconnectedCallback() { clearInterval(this.timer); clearInterval(this.ageTimer); this.stopSubscription(); }
   stopSubscription() {
     this.subscriptionGeneration = (this.subscriptionGeneration || 0) + 1;
     this.subscriptionKey = null;
@@ -138,9 +179,9 @@ class GluciferCard extends HTMLElement {
     if (!this._hass || !this.config) return;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     // All dynamic labels and states are assigned through textContent.
-    this.shadowRoot.innerHTML = `<style>
-      ha-card {display:block;padding:20px} h2 {margin:0 0 12px;font-size:20px} .reading {display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
-      .glucose,.trend {font-size:42px;font-weight:600} .trend {white-space:nowrap}
+    if (!this.shadowRoot.hasChildNodes()) this.shadowRoot.innerHTML = `<style>
+      ha-card {display:block;padding:20px} h2 {margin:0 0 12px;font-size:20px} .reading {display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .glucose,.trend {font-size:42px;font-weight:600} .trend {white-space:nowrap;font-size:52px;line-height:1;margin-left:auto} .glucose {font-size:clamp(28px,7vw,42px)}
       .detail {color:var(--secondary-text-color);margin:8px 0} .warning {color:var(--warning-color)}
       svg {width:100%;height:180px;overflow:visible} path {fill:none;stroke:var(--primary-color);stroke-width:2}
       .axis {display:flex;justify-content:space-between;font-size:12px;color:var(--secondary-text-color)}
@@ -150,10 +191,10 @@ class GluciferCard extends HTMLElement {
       .journal-list {display:grid;gap:6px} .journal-list button {text-align:left;margin:0;padding:8px;border:1px solid var(--divider-color);border-radius:6px}
       .journal-selection {padding:12px;border:1px solid var(--divider-color);border-radius:8px;white-space:pre-wrap}
       [hidden] {display:none!important}
-    </style><ha-card><h2></h2><div class="reading"><div class="glucose"></div><span class="trend"></span></div><div class="detail summary"></div>
-      <div class="warning health"></div><svg viewBox="0 0 600 180" role="img" aria-label="Glucose history"><path></path><g class="journal-markers"></g></svg>
+    </style><ha-card><h2></h2><div class="reading"><div class="glucose"></div><span class="trend"></span></div><div class="detail summary"><span class="delta"></span><span class="reading-age"></span></div><div class="detail optional-values"></div>
+      <div class="warning health"></div><div class="native-chart" hidden></div><svg viewBox="0 0 600 180" role="img" aria-label="Glucose history"><path></path><g class="journal-markers"></g></svg>
       <div class="axis"><span class="start"></span><span class="range"></span><span class="end"></span></div>
-      <div class="detail journal-legend" hidden>▲ Insulin · ● Carbohydrates · ■ Note</div><div class="detail history"></div><div class="journal-selection" hidden></div><section class="journal-section" hidden><h3>Journal</h3><div class="journal-count detail"></div><div class="journal-list"></div></section><ul></ul><div class="detail lifecycle"></div><button>More details</button></ha-card>`;
+      <div class="detail journal-legend" hidden>▲ Insulin · ● Carbohydrates · ■ Note</div><div class="detail history"></div><div class="journal-selection" hidden><div class="selection-label"></div><div class="selection-note"></div><button>Close</button></div><section class="journal-section" hidden><h3>Journal</h3><div class="journal-count detail"></div><div class="journal-list"></div></section><ul></ul><div class="detail lifecycle"></div><button>More details</button></ha-card>`;
     const root = this.shadowRoot;
     const text = (selector, value) => { root.querySelector(selector).textContent = value; };
     const states = this._hass.states;
@@ -165,8 +206,7 @@ class GluciferCard extends HTMLElement {
     const value = valid ? Number(glucose.state) : NaN;
     const glucosePrecision = unit === "mg/dL" ? 0 : 1;
     text("h2", this.config.title || "Glucifer HA");
-    text(".glucose", Number.isFinite(value) ? `${value.toFixed(glucosePrecision)} ${unit}` : "Unavailable");
-    const age = state("reading_age")?.state;
+    text(".glucose", Number.isFinite(value) ? `${value.toFixed(glucosePrecision)}${this.config.show_glucose_unit ? ` ${unit}` : ""}` : "Unavailable");
     const trend = state("trend")?.state;
     const trendArrow = new Map([
       ["DoubleUp", "↑↑"], ["SingleUp", "↑"], ["FortyFiveUp", "↗"],
@@ -175,53 +215,69 @@ class GluciferCard extends HTMLElement {
     text(".trend", Number.isFinite(value) ? trendArrow || "" : "");
     root.querySelector(".glucose").style.color = gluciferGlucoseColor(value, unit, this.config);
     root.querySelector(".trend").style.color = gluciferTrendColor(Number.isFinite(value) ? trend : null, this.config);
-    root.querySelector(".summary").hidden = !this.config.show_details;
-    for (const selector of ["svg", ".axis", ".history"]) root.querySelector(selector).toggleAttribute("hidden", !this.config.show_history);
+    root.querySelector(".trend").hidden = !this.config.show_trend;
+    root.querySelector(".summary").hidden = !this.config.show_delta_mgdl && !this.config.show_reading_age;
     root.querySelector("ul").hidden = !this.config.show_alerts;
-    root.querySelector(".lifecycle").hidden = !this.config.show_lifecycle;
     const delta = state("delta_mgdl");
-    text(".summary", [
-      delta && Number.isFinite(Number(delta.state)) ? `Δ ${Number(delta.state).toFixed(1)} ${delta.attributes.unit_of_measurement}` : null,
-      age && Number.isFinite(Number(age)) ? `Reading ${Math.floor(Number(age) / 60)} min old` : null].filter(Boolean).join(" · "));
+    text(".delta", this.config.show_delta_mgdl && delta && Number.isFinite(Number(delta.state))
+      ? `Δ ${Number(delta.state).toFixed(1)} ${delta.attributes.unit_of_measurement}` : "");
+    this.updateAge();
     text(".health", state("connected")?.state === "off" ? "Phone has not contacted Home Assistant recently" : state("stale")?.state === "on" ? "Glucose reading is stale" : "");
-    const until = Date.now();
-    const since = until - Math.max(1, Math.min(168, Number(this.config.hours) || 24)) * 3600000;
-    const points = (this.data?.readings || []).filter(p => p.time_ms >= since && p.time_ms <= until);
-    const convert = n => unit === "mmol/L" ? n / 18.016 : n;
-    const values = points.map(p => convert(p.mgdl));
-    const min = values.length ? Math.min(...values) : 0;
-    const max = values.length ? Math.max(...values) : 1;
-    let previous = 0;
-    const path = points.map(p => {
-      const command = p.time_ms - previous > 600000 ? "M" : "L";
-      previous = p.time_ms;
-      return `${command}${((p.time_ms-since)/(until-since)*600).toFixed(2)},${(170-(convert(p.mgdl)-min)/Math.max(max-min,1)*160).toFixed(2)}`;
-    }).join(" ");
-    root.querySelector("path").setAttribute("d", path);
-    text(".start", new Date(since).toLocaleString());
-    text(".end", new Date(until).toLocaleTimeString());
-    text(".range", points.length ? `${min.toFixed(glucosePrecision)} to ${max.toFixed(glucosePrecision)} ${unit}` : "No history");
-    this.renderJournal(root, points, since, until, convert, min, max);
-    text(".history", this.error || `${points.length} readings at their measurement times. Gaps over 10 min remain visible.`);
+    const historySignature = JSON.stringify([this.data?.readings, this.data?.journal, this.data?.journal_enabled, this.data?.journal_history_days,
+      this.config, unit, this._hass.locale, this._hass.config?.time_zone, this.error, Boolean(customElements.get("ha-chart-base")), Math.floor(Date.now()/60000)]);
+    if (historySignature !== this.historySignature) {
+      this.historySignature = historySignature;
+      root.querySelector(".history").hidden = !this.config.show_history;
+      const until = Date.now();
+      const since = until - Math.max(1, Math.min(168, Number(this.config.hours) || 24)) * 3600000;
+      const points = (this.data?.readings || []).filter(p => p.time_ms >= since && p.time_ms <= until);
+      const convert = n => unit === "mmol/L" ? n / 18.016 : n;
+      const values = points.map(p => convert(p.mgdl));
+      const min = values.length ? Math.min(...values) : 0;
+      const max = values.length ? Math.max(...values) : 1;
+      let previous = 0;
+      const path = points.map(p => {
+        const command = p.time_ms - previous > 600000 ? "M" : "L";
+        previous = p.time_ms;
+        return `${command}${((p.time_ms-since)/(until-since)*600).toFixed(2)},${(170-(convert(p.mgdl)-min)/Math.max(max-min,1)*160).toFixed(2)}`;
+      }).join(" ");
+      root.querySelector("path").setAttribute("d", path);
+      text(".start", this.formatDateTime(since));
+      text(".end", this.formatDateTime(until, true));
+      text(".range", points.length ? `${min.toFixed(glucosePrecision)} to ${max.toFixed(glucosePrecision)} ${unit}` : "No history");
+      this.renderJournal(root, points, since, until, convert, min, max);
+      this.renderChart(points, since, until, convert, unit, min);
+      text(".history", this.error || `${points.length} readings at their measurement times. Gaps over 10 min remain visible.`);
+    }
+    root.querySelector("ul").replaceChildren();
     Object.keys(entities).filter(key => key.startsWith("alert_") && state(key)?.state === "on").forEach(key => {
       const li = document.createElement("li"); li.textContent = state(key).attributes.friendly_name; root.querySelector("ul").append(li);
     });
-    const lifecycle = ["sensor_started_ms", "sensor_expires_ms", "sensor_warmup"].map(key => state(key)).filter(s => s && !["unknown", "unavailable"].includes(s.state));
-    text(".lifecycle", lifecycle.map(s => `${s.attributes.friendly_name}: ${s.state}`).join(" · "));
+    const available = key => this.config[`show_${key}`] && state(key) && !["unknown", "unavailable", ""].includes(state(key).state);
+    const formatted = key => {
+      const s = state(key);
+      if (key.endsWith("_ms")) return this.formatDateTime(s.state);
+      if (key === "sensor_warmup") return s.state === "on" ? "Yes" : "No";
+      return `${s.state}${s.attributes.unit_of_measurement ? ` ${s.attributes.unit_of_measurement}` : ""}`;
+    };
+    for (const [selector, keys] of [[".lifecycle", GLUCIFER_SENSOR_FIELDS], [".optional-values", ["rate_mgdl_min", "raw_mgdl", "auto_mgdl", "iob_u", "cob_g", "battery_percent"]]]) {
+      text(selector, keys.filter(available).map(key => `${GLUCIFER_FIELDS[key]}: ${formatted(key)}`).join(" · "));
+      root.querySelector(selector).hidden = !root.querySelector(selector).textContent;
+    }
+    this.renderedStates = this.stateSignature();
     root.querySelector("ha-card > button").onclick = () => this.dispatchEvent(new CustomEvent("hass-more-info", {detail: {entityId: this.config.entity}, bubbles: true, composed: true}));
   }
   renderJournal(root, points, since, until, convert, min, max) {
     const cutoff = until - this.config.journal_days * 86400000;
     const entries = (this.data?.journal || []).filter(e => e.time_ms >= cutoff && e.time_ms <= until && this.config.journal_types.includes(e.kind));
     const number = value => new Intl.NumberFormat(this._hass?.locale?.language, {maximumFractionDigits:2}).format(value);
-    const description = entry => `${entry.label || entry.kind}${entry.amount != null ? ` · ${number(entry.amount)} ${entry.kind === "insulin" ? "U" : "g"}` : ""} · ${new Date(entry.time_ms).toLocaleString()}`;
-    const select = entry => {
-      const details = root.querySelector(".journal-selection");
-      details.replaceChildren(); details.hidden = false;
-      const label = document.createElement("div"); label.textContent = description(entry); details.append(label);
-      if (entry.note) { const note = document.createElement("div"); note.textContent = entry.note; details.append(note); }
-      const close = document.createElement("button"); close.textContent = "Close"; close.onclick = () => { details.hidden = true; }; details.append(close);
-    };
+    const description = entry => `${entry.label || entry.kind}${entry.amount != null ? ` · ${number(entry.amount)} ${entry.kind === "insulin" ? "U" : "g"}` : ""} · ${this.formatDateTime(entry.time_ms)}`;
+    this.journalEntries = entries;
+    this.journalDescription = description;
+    const select = entry => { this.selectedJournalId = entry.id; this.renderSelection(); };
+    this.renderSelection();
+    root.querySelector(".journal-markers").replaceChildren();
+    root.querySelector(".journal-list").replaceChildren();
     if (this.config.show_journal_markers) {
       const group = root.querySelector(".journal-markers");
       for (const entry of entries.filter(e => e.time_ms >= since)) {
@@ -251,6 +307,121 @@ class GluciferCard extends HTMLElement {
         : "Enable journal sync in JugglucoNG to display entries.";
       for (const entry of visible) { const button = document.createElement("button"); button.textContent = description(entry); button.onclick = () => select(entry); root.querySelector(".journal-list").append(button); }
     }
+  }
+  async loadChart() {
+    if (this.chartLoading || customElements.get("ha-chart-base")) return;
+    if (!window.loadCardHelpers) return; // Standalone preview or an older HA frontend.
+    this.chartLoading = true;
+    let timeout;
+    try {
+      const helpers = await window.loadCardHelpers();
+      // Load HA's history module without attaching a recorder card or requesting recorder data.
+      helpers.createCardElement({type:"history-graph", entities:[this.config?.entity || "sensor.glucose"]});
+      await Promise.race([customElements.whenDefined("ha-chart-base"), new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("Chart load timeout")), 15000); })]);
+      if (this.isConnected) this.render();
+    } catch (_) { /* The existing SVG remains available if the frontend module cannot load. */ }
+    finally { clearTimeout(timeout); this.chartLoading = false; }
+  }
+  renderChart(points, since, until, convert, unit, min) {
+    const root = this.shadowRoot, host = root.querySelector(".native-chart");
+    const native = Boolean(customElements.get("ha-chart-base"));
+    host.hidden = !this.config.show_history || !native;
+    root.querySelector("svg").toggleAttribute("hidden", !this.config.show_history || native);
+    root.querySelector(".axis").hidden = !this.config.show_history || native;
+    if (!native || !this.config.show_history) return;
+    if (!this.chartElement) {
+      this.chartElement = document.createElement("ha-chart-base");
+      this.chartElement.height = "240px";
+      this.chartElement.addEventListener("chart-click", event => {
+        const id = event.detail?.data?.journalId;
+        if (id) { this.selectedJournalId = id; this.renderSelection(); }
+      });
+      host.append(this.chartElement);
+    }
+    this.chartElement.hass = this._hass;
+    const entries = this.config.show_journal_markers ? this.journalEntries.filter(e => e.time_ms >= since) : [];
+    const signature = JSON.stringify([points, entries, unit, this.config.hours, this._hass.locale, this._hass.config?.time_zone]);
+    if (signature === this.chartSignature) return;
+    this.chartSignature = signature;
+    const data = [];
+    let previous;
+    for (const point of points) {
+      if (previous && point.time_ms - previous > 600000) data.push([previous+1, null]);
+      data.push([point.time_ms, convert(point.mgdl)]);
+      previous = point.time_ms;
+    }
+    const series = [{id:"glucose", name:"Glucose", type:"line", showSymbol:false, connectNulls:false, sampling:"minmax", data, lineStyle:{width:2}}];
+    for (const [kind,symbol,color] of [["insulin","triangle","#7e57c2"],["carbs","circle","#fb8c00"],["note","rect","#00838f"]]) {
+      series.push({id:kind, name:kind, type:"line", lineStyle:{opacity:0}, symbol, symbolSize:12, showSymbol:true, showAllSymbol:true, itemStyle:{color}, z:5,
+        data:entries.filter(e => e.kind === kind).map(entry => {
+          let left=0,right=points.length;
+          while(left<right) { const middle=(left+right)>>>1; if(points[middle].time_ms<entry.time_ms) left=middle+1; else right=middle; }
+          const nearest=[points[left-1],points[left]].filter(Boolean).sort((a,b)=>Math.abs(a.time_ms-entry.time_ms)-Math.abs(b.time_ms-entry.time_ms))[0];
+          return {value:[entry.time_ms,nearest && Math.abs(nearest.time_ms-entry.time_ms)<=600000 ? convert(nearest.mgdl) : min],journalId:entry.id};
+        })});
+    }
+    this.chartElement.options = {
+      animation:false, grid:{left:45,right:15,top:20,bottom:35},
+      xAxis:{type:"time",min:since,max:until}, yAxis:{type:"value",scale:true,name:unit},
+      tooltip:{trigger:"axis",confine:true,formatter:params => {
+        const box = document.createElement("div");
+        for (const p of Array.isArray(params) ? params : [params]) {
+          const entry = this.journalEntries.find(e => e.id === p.data?.journalId);
+          const row = document.createElement("div");
+          row.textContent = entry ? this.journalDescription(entry) : `${this.formatDateTime(p.value[0])} · ${Number(p.value[1]).toFixed(unit === "mg/dL" ? 0 : 1)} ${unit}`;
+          box.append(row);
+        }
+        return box;
+      }},
+    };
+    this.chartElement.data = series;
+  }
+  renderSelection() {
+    const root = this.shadowRoot;
+    const entry = (this.config.show_journal || (this.config.show_history && this.config.show_journal_markers)) && this.journalEntries?.find(e => e.id === this.selectedJournalId);
+    if (!entry) this.selectedJournalId = null;
+    root.querySelector(".journal-selection").hidden = !entry;
+    root.querySelector(".selection-label").textContent = entry ? this.journalDescription(entry) : "";
+    root.querySelector(".selection-note").textContent = entry?.note || "";
+    root.querySelector(".journal-selection button").onclick = () => { this.selectedJournalId = null; this.renderSelection(); };
+  }
+  updateAge() {
+    const label = this.shadowRoot?.querySelector(".reading-age");
+    if (!label) return;
+    const states = this._hass?.states || {}, entities = this.data?.entities || {};
+    const measured = Date.parse(states[entities.measurement_time]?.state);
+    const ageState = states[entities.reading_age];
+    const ageKey = JSON.stringify([ageState?.state, ageState?.last_updated]);
+    if (ageKey !== this.ageKey) {
+      this.ageKey = ageKey;
+      this.ageObservedAt = Date.parse(ageState?.last_updated) || Date.now();
+    }
+    const seconds = Number.isFinite(measured) ? (Date.now() - measured) / 1000
+      : ageState && Number.isFinite(Number(ageState.state)) ? Number(ageState.state) + (Date.now() - this.ageObservedAt) / 1000 : NaN;
+    let value = "";
+    if (this.config.show_reading_age && Number.isFinite(seconds)) {
+      const age = Math.max(0, Math.floor(seconds));
+      const duration = age < 60 ? `${age}s` : age < 3600 ? `${Math.floor(age/60)}m ${age%60}s` : `${Math.floor(age/3600)}h ${Math.floor(age%3600/60)}m ${age%60}s`;
+      value = `${this.shadowRoot.querySelector(".delta").textContent ? " · " : ""}Reading ${duration} old`;
+    }
+    if (label.textContent !== value) label.textContent = value;
+  }
+  formatDateTime(value, timeOnly = false) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return "Unavailable";
+    const locale = this._hass?.locale || {};
+    const timeZone = locale.time_zone === "local" ? undefined : this._hass?.config?.time_zone;
+    const timeLocale = locale.time_format === "system" ? undefined : locale.language;
+    const hour12 = locale.time_format === "12" ? true : locale.time_format === "24" ? false
+      : new Intl.DateTimeFormat(timeLocale, {hour:"numeric"}).resolvedOptions().hour12;
+    const time = new Intl.DateTimeFormat(timeLocale, {hour:hour12 ? "numeric" : "2-digit", minute:"2-digit", hourCycle:hour12 ? "h12" : "h23", timeZone}).format(date);
+    if (timeOnly) return time;
+    const formatter = new Intl.DateTimeFormat(locale.date_format === "system" ? undefined : locale.language, {year:"numeric",month:"numeric",day:"numeric",timeZone});
+    const order = {DMY:["day","month","year"],MDY:["month","day","year"],YMD:["year","month","day"]}[locale.date_format];
+    const parts = formatter.formatToParts(date);
+    const part = type => parts.find(p => p.type === type)?.value || "";
+    const lastLiteral = parts.at(-1)?.type === "literal" && !(locale.language === "bg" && locale.date_format === "YMD") ? parts.at(-1).value : "";
+    return `${order ? order.map(part).join(part("literal")) + lastLiteral : formatter.format(date)}, ${time}`;
   }
   getCardSize() { return (this.config?.show_history === false ? 2 : 6) + (this.config?.show_journal ? 4 : 0); }
 }

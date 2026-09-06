@@ -3,7 +3,9 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 (async () => {
   const browser = await chromium.launch({headless:true});
-  const page = await browser.newPage({viewport:{width:640,height:720}});
+  const page = await browser.newPage({viewport:{width:640,height:720},timezoneId:'UTC'});
+  await page.clock.install({time:new Date('2026-09-06T12:00:00Z')});
+  await page.clock.pauseAt(new Date('2026-09-06T12:00:00Z'));
   const errors=[];page.on('pageerror', error=>errors.push(String(error)));
   await page.setContent('<style>body{font-family:Arial;background:#f4f6f8;--primary-color:#007d82;--secondary-text-color:#58656d;--warning-color:#a05300}ha-card{display:block;background:white;border-radius:16px}</style><glucifer-card></glucifer-card>');
   await page.addScriptTag({path:path.join(__dirname, '../../custom_components/glucifer/frontend/glucifer-card.js')});
@@ -21,19 +23,19 @@ const path = require('node:path');
   assert.equal(await root.locator('.glucose').textContent(),'123 mg/dL');
   assert.equal(await root.locator('.range').textContent(),'100 to 123 mg/dL');
   assert.equal(await root.locator('.trend').textContent(),'→');
-  assert.equal(await root.locator('.summary').textContent(),'Δ 0.0 mg/dL · Reading 1 min old');
+  assert.equal(await root.locator('.summary').textContent(),'Δ 0.0 mg/dL · Reading 1m 0s old');
   await page.evaluate(()=>{window.fixture.states['sensor.phone_trend'].state='FortyFiveDown';document.querySelector('glucifer-card').hass=window.fixture;});
   assert.equal(await root.locator('.trend').textContent(),'↘');
   const glucoseBox=await root.locator('.glucose').boundingBox();
   const trendBox=await root.locator('.trend').boundingBox();
-  assert.ok(trendBox.x>=glucoseBox.x+glucoseBox.width && Math.abs(trendBox.y-glucoseBox.y)<2);
+  assert.ok(trendBox.x>=glucoseBox.x+glucoseBox.width && trendBox.height>glucoseBox.height && trendBox.x+trendBox.width>580);
   await page.evaluate(()=>{window.fixture.states['sensor.phone_trend'].state='unavailable';document.querySelector('glucifer-card').hass=window.fixture;});
   assert.equal(await root.locator('.trend').textContent(),'');
-  assert.equal(await root.locator('.summary').textContent(),'Δ 0.0 mg/dL · Reading 1 min old');
+  assert.equal(await root.locator('.summary').textContent(),'Δ 0.0 mg/dL · Reading 1m 0s old');
   await page.evaluate(()=>{window.fixture.states['sensor.phone_trend'].state='Flat';document.querySelector('glucifer-card').hass=window.fixture;});
   assert.equal((await root.locator('path').getAttribute('d')).match(/M/g).length,2);
   assert.equal(await root.locator('img').count(),0);
-  await root.locator('button').click();assert.equal(await page.evaluate(()=>window.moreInfo),'sensor.phone_glucose');
+  await root.locator('ha-card > button').click();assert.equal(await page.evaluate(()=>window.moreInfo),'sensor.phone_glucose');
   if (process.env.GLUCIFER_SCREENSHOT) await page.screenshot({path:process.env.GLUCIFER_SCREENSHOT});
   await page.evaluate(()=>{window.fixture.states['sensor.phone_glucose']={state:'6.8',attributes:{unit_of_measurement:'mmol/L'}};window.fixture.states['binary_sensor.phone_stale'].state='on';document.querySelector('glucifer-card').hass=window.fixture;});
   assert.equal(await root.locator('.glucose').textContent(),'6.8 mmol/L');
@@ -87,6 +89,72 @@ const path = require('node:path');
   assert.match(await root.locator('.journal-selection').textContent(), /25 g/);
   assert.match(await root.locator('.journal-selection').textContent(), /<img src=x/);
   assert.equal(await root.locator('img').count(),0);
+  // Unrelated HA traffic must neither redraw the card nor dismiss journal details.
+  await page.evaluate(() => {
+    const card=document.querySelector('glucifer-card');
+    window.savedClose=card.shadowRoot.querySelector('.journal-selection button');
+    window.cardRenders=0;
+    const render=card.render.bind(card);
+    card.render=()=>{window.cardRenders++;return render();};
+    window.fetchesBeforeUnrelated=window.fetches;
+    for(let i=0;i<100;i++) {
+      window.fixture.states['sensor.unrelated_clock']={state:String(i),attributes:{}};
+      card.hass=window.fixture;
+    }
+  });
+  assert.equal(await page.evaluate(()=>window.cardRenders),0);
+  assert.equal(await page.evaluate(()=>window.fetches),await page.evaluate(()=>window.fetchesBeforeUnrelated));
+  assert.equal(await root.locator('.journal-selection').isVisible(),true);
+  await root.locator('.journal-selection button').focus();
+  await page.evaluate(()=>{
+    window.fixture.states['sensor.phone_glucose'].state='124';
+    document.querySelector('glucifer-card').hass=window.fixture;
+  });
+  assert.equal(await root.locator('.glucose').textContent(),'124 mg/dL');
+  assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').shadowRoot.activeElement===window.savedClose),true);
+  // A relevant state change between mouse-down and mouse-up must not replace Close.
+  await root.locator('.journal-selection button').hover();
+  await page.mouse.down();
+  await page.evaluate(()=>{
+    window.fixture.states['sensor.phone_glucose'].state='125';
+    document.querySelector('glucifer-card').hass=window.fixture;
+  });
+  await page.mouse.up();
+  assert.equal(await root.locator('.journal-selection').isVisible(),false);
+  await page.evaluate(()=>{
+    window.fixture.states['sensor.phone_glucose'].state='126';
+    document.querySelector('glucifer-card').hass=window.fixture;
+  });
+  assert.equal(await root.locator('.journal-selection').isVisible(),false);
+  assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.journal-selection button')===window.savedClose),true);
+  const rendersBeforeAge=await page.evaluate(()=>window.cardRenders);
+  await page.evaluate(()=>{
+    window.fixture.states['sensor.phone_age'].state='61';
+    document.querySelector('glucifer-card').hass=window.fixture;
+  });
+  assert.equal(await page.evaluate(()=>window.cardRenders),rendersBeforeAge);
+  await page.evaluate(()=>{
+    window.fixture.states['sensor.phone_age'].state='120';
+    document.querySelector('glucifer-card').hass=window.fixture;
+  });
+  assert.match(await root.locator('.summary').textContent(),/Reading 2m 0s old/);
+  assert.equal(await page.evaluate(()=>window.cardRenders),rendersBeforeAge);
+  // Seconds tick locally from measurement time, independently of HA traffic.
+  await page.clock.setSystemTime(new Date('2026-09-06T12:00:00Z'));
+  await page.evaluate(()=>{
+    const card=document.querySelector('glucifer-card');
+    card.data.entities.measurement_time='sensor.phone_measurement_time';
+    window.fixture.states['sensor.phone_measurement_time']={state:'2026-09-06T11:59:18Z',attributes:{}};
+    card.hass=window.fixture;
+  });
+  assert.match(await root.locator('.reading-age').textContent(),/Reading 42s old/);
+  const ageFetches=await page.evaluate(()=>window.fetches);
+  await page.clock.runFor(1000);
+  assert.match(await root.locator('.reading-age').textContent(),/Reading 43s old/);
+  assert.equal(await page.evaluate(()=>window.cardRenders),rendersBeforeAge);
+  assert.equal(await page.evaluate(()=>window.fetches),ageFetches);
+  await page.clock.setSystemTime(new Date('2026-09-06T12:00:00Z'));
+
   await root.locator('polygon.journal-marker').focus();
   await page.keyboard.press('Enter');
   assert.match(await root.locator('.journal-selection').textContent(), /0.05 U/);
@@ -107,6 +175,46 @@ const path = require('node:path');
   assert.equal(await root.locator('.journal-list button').count(),1);
   await page.setViewportSize({width:360,height:740});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  // Every sender field has a matching display control, including sensor identity.
+  for (const key of ['trend','delta_mgdl','rate_mgdl_min','raw_mgdl','auto_mgdl','iob_u','cob_g','battery_percent','sensor_id','sensor_generation','sensor_started_ms','sensor_expires_ms','sensor_warmup']) {
+    assert.ok(fields.find(field=>field.name===`show_${key}`)?.selector.boolean);
+  }
+  await page.evaluate(()=>{
+    const card=document.querySelector('glucifer-card');
+    window.fixture.locale={language:'de',time_format:'24',date_format:'DMY',time_zone:'server'};
+    window.fixture.config={time_zone:'Europe/Berlin'};
+    Object.assign(card.data.entities,{sensor_id:'sensor.id',sensor_generation:'sensor.gen',sensor_expires_ms:'sensor.expiry',sensor_warmup:'binary_sensor.warmup',iob_u:'sensor.iob'});
+    Object.assign(window.fixture.states,{'sensor.id':{state:'ABC123',attributes:{}},'sensor.gen':{state:'3',attributes:{}},'sensor.expiry':{state:'2026-09-06T23:30:00+00:00',attributes:{}},'binary_sensor.warmup':{state:'off',attributes:{}},'sensor.iob':{state:'1.2',attributes:{unit_of_measurement:'U'}}});
+    card.hass=window.fixture;
+  });
+  assert.match(await root.locator('.lifecycle').textContent(),/Sensor identifier: ABC123/);
+  assert.match(await root.locator('.lifecycle').textContent(),/Sensor generation: 3/);
+  assert.match(await root.locator('.lifecycle').textContent(),/Expected end: 7\.9\.2026, 01:30/);
+  assert.match(await root.locator('.lifecycle').textContent(),/Sensor warming up: No/);
+  assert.match(await root.locator('.optional-values').textContent(),/Insulin on board: 1.2 U/);
+  await page.evaluate(()=>{
+    const card=document.querySelector('glucifer-card');
+    card.config.show_sensor_id=false;card.config.show_sensor_generation=false;card.config.show_iob_u=false;card.render();
+  });
+  assert.doesNotMatch(await root.locator('.lifecycle').textContent(),/ABC123|generation/);
+  assert.equal(await root.locator('.optional-values').isVisible(),false);
+  await page.evaluate(()=>{window.fixture.locale={language:'en-US',date_format:'MDY',time_format:'12',time_zone:'local'};document.querySelector('glucifer-card').hass=window.fixture;});
+  assert.match(await root.locator('.lifecycle').textContent(),/Expected end: 9\/6\/2026, 11:30 PM/);
+  await page.evaluate(()=>{window.fixture.states['sensor.expiry'].state='unavailable';document.querySelector('glucifer-card').hass=window.fixture;});
+  assert.doesNotMatch(await root.locator('.lifecycle').textContent(),/Expected end/);
+  assert.equal(form.defaults.show_glucose_unit,true);
+  assert.equal(fields.find(field=>field.name==='show_glucose_unit').default,true);
+  assert.deepEqual(await page.evaluate(()=>{
+    const form=customElements.get('glucifer-card').getConfigForm();
+    form.assertConfig({entity:'sensor.phone_glucose',show_lifecycle:false,show_sensor_id:true,show_details:false});
+    return Object.fromEntries(form.schema.flatMap(s=>s.schema||[s]).filter(s=>['show_sensor_id','show_sensor_generation','show_delta_mgdl','show_reading_age','show_glucose_unit'].includes(s.name)).map(s=>[s.name,s.default]));
+  }),{show_sensor_id:true,show_sensor_generation:false,show_delta_mgdl:false,show_reading_age:false,show_glucose_unit:true});
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_glucose_unit=false;card.render();});
+  assert.equal(await root.locator('.glucose').textContent(),'6.8');
+  await page.evaluate(()=>{window.fixture.states['sensor.phone_glucose']={state:'139.0',attributes:{unit_of_measurement:'mg/dL'}};document.querySelector('glucifer-card').hass=window.fixture;});
+  assert.equal(await root.locator('.glucose').textContent(),'139');
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_glucose_unit=true;card.render();});
+  assert.equal(await root.locator('.glucose').textContent(),'139 mg/dL');
   // An entity change during an outstanding request must fetch the new entity.
   await page.evaluate(()=>{
     const card=document.querySelector('glucifer-card');

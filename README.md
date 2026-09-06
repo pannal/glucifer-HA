@@ -61,9 +61,9 @@ Keep the connection URL and QR code private: they contain a secret.
 Browser captures of the bundled card with **synthetic data**, shown in light
 and dark themes. These are card previews, not captures from a live HA installation.
 
-| mg/dL with journal markers and history | mmol/L with stale data and journal |
+| mg/dL with journal markers and history | mmol/L with journal markers and history |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/v0.3.0/docs/screenshots/dashboard-mgdl.png" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/v0.3.0/docs/screenshots/dashboard-mmol-stale.png" alt="Glucifer card in dark mode with unavailable glucose, a stale-data warning, journal markers, and history in mmol/L" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
 
 ## Setup details
 
@@ -82,6 +82,10 @@ resources explicitly in YAML, use the [YAML resource setup](docs/guide.md#yaml-d
 
 The card finds the receiver's other entities automatically. Enable history
 backfill in JugglucoNG to recover up to seven days of retained readings.
+The chart uses HA’s hover, zoom, and reset controls. Reading age shows seconds;
+the larger trend arrow sits on the right. **Show glucose unit** hides or shows
+the unit beside the main value.
+
 Imported readings appear in this card; they do not rewrite HA Recorder history.
 
 [Full dashboard example](examples/dashboard.yaml) ·
@@ -112,7 +116,10 @@ successful journal request. Hiding the list only changes the card's display.
 <details>
 <summary><strong>Fields, alerts, and automations</strong></summary>
 
-Each optional field and alert has its own toggle in JugglucoNG. Disabled or
+Each optional field and alert has its own toggle in JugglucoNG. The card’s
+**Glucose and phone data** and **Sensor data** controls use the same field names
+and only change what the card displays. Sensor dates follow your HA profile’s
+date, time, and time-zone preferences. Disabled or
 unknown fields become unavailable, never an invented zero or false value.
 Alerts reflect JugglucoNG's active episodes as `on` or `off`; stale alerts
 become unavailable. The default stale interval is five minutes.

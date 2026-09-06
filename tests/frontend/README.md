@@ -1,0 +1,23 @@
+Browser checks run against the bundled card. `check.cjs` covers standalone
+fallback rendering, editor controls, localization, subscriptions, and races.
+`native-check.cjs` uses the real chart and ECharts modules from HA 2026.9.1's
+frontend package. It checks canvas clicks, tooltips, gaps, zoom, and updates.
+
+Prepare the official frontend package without installing it into HA:
+
+```sh
+python3 -m pip download --no-deps home-assistant-frontend==20260826.6 -d /tmp/glucifer-frontend
+python3 -m zipfile -e /tmp/glucifer-frontend/home_assistant_frontend-20260826.6-py3-none-any.whl /tmp/glucifer-frontend/unpacked
+export GLUCIFER_HA_FRONTEND=/tmp/glucifer-frontend/unpacked/hass_frontend
+npm ci
+npx playwright install chromium
+npm test
+node tests/frontend/native-check.cjs
+node docs/screenshots/capture.cjs
+```
+
+The native harness replaces only the frontend application's startup entry to
+avoid requiring a login or live server. It supplies dashboard theme context
+and synthetic states; chart code and interaction handlers are unmodified.
+The pinned chunk map in `ha-native.cjs` must be updated when the frontend
+version changes. No frontend binaries are committed or shipped with the card.

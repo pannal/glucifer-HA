@@ -189,7 +189,7 @@ reads history through your authenticated Home Assistant connection.
 
 1. Set up the Glucifer integration and refresh your HA browser.
 2. Edit your dashboard, then choose **Add card > Glucifer HA**.
-3. Select the phone's glucose entity. Expand **Display**, **Journal**,
+3. Select the phone's glucose entity. Expand **Display**, **Glucose and phone data**, **Sensor data**, **Journal**,
    **Glucose value colors**, or **Trend arrow colors** to adjust the card.
    Save the card when finished.
 
@@ -213,8 +213,29 @@ hours: 24
 The card finds the selected receiver's trend, delta, freshness, lifecycle, and
 active alert entities automatically. Its chart supports 1 to 168 hours and
 leaves gaps longer than ten minutes visible. Unknown values remain unknown.
-The **More details** button opens the glucose entity. Delta and reading age,
-active alerts, sensor details, and the glucose chart can each be hidden.
+The **More details** button opens the glucose entity. The editor has individual
+controls matching each optional field in JugglucoNG, including sensor identifier,
+generation, activation, expected end, and warmup. They control display; enabling
+one does not enable transmission on the phone. Fields that have not been sent or
+are unavailable are omitted. Existing `show_details: false` and
+`show_lifecycle: false` YAML settings remain supported.
+
+The main value stays on the left, with a larger trend arrow on the right.
+**Show glucose unit**, enabled by default, controls the unit beside that value.
+Chart and detail units stay visible. Reading age shows seconds from the original
+measurement time. Only that label updates every second; unrelated HA state
+changes do not redraw the chart or request history. Journal details stay open
+until closed, removed, or hidden by a filter.
+
+Sensor and journal dates use your HA profile's language, date order, 12/24-hour
+format, and browser/server time-zone preference. UTC timestamps are converted
+before display.
+
+The card reuses HA's native chart component with Glucifer's stored readings.
+Hover to inspect values, hold Ctrl (Command on Mac) while scrolling to zoom,
+drag to pan, and use HA's reset control to restore the full window. Touch
+screens support pinch zoom. Journal markers remain selectable while zoomed.
+If HA's chart module cannot load, a basic chart remains available.
 
 The glucose value and trend arrow have separate color controls. Default
 value boundaries are **54, 70, 180, and 250 mg/dL**: dark red below 54, red
@@ -237,7 +258,7 @@ If you explicitly manage resources in YAML, that configuration remains
 authoritative. Add this entry to your existing resource list:
 
 ```yaml
-- url: /glucifer/glucifer-card.js?v=0.3.1
+- url: /glucifer/glucifer-card.js?v=0.4.0
   type: module
 ```
 
