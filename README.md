@@ -1,6 +1,6 @@
-# Glucifer HA
+# Glucifer for Home Assistant
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png" alt="Glucifer HA: a horned glucose drop with a chart line and insulin pen" width="100%">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png" alt="Glucifer for Home Assistant: horned glucose drop, chart, and insulin pen beside the Home Assistant logo" width="100%">
 
 Bring [JugglucoNG](https://github.com/ctqvva/JugglucoNG) glucose readings into
 Home Assistant through a private webhook. Includes mg/dL and mmol/L,

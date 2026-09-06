@@ -5,5 +5,11 @@ SPDX-License-Identifier: GPL-3.0-or-later
 This project is distributed under the GNU General Public License, version 3
 or any later version. The full license text is in LICENSE.
 
-The Glucifer HA icon and banner in docs/brand/ and the icon exports in
+The Glucifer artwork in docs/brand/ and the icon exports in
 custom_components/glucifer/brand/ are distributed under the same license.
+
+The Home Assistant name and logo shown in the banner belong to the Open Home
+Foundation. Their use identifies the platform this integration supports;
+this project's license does not grant rights to those trademarks.
+
+Home Assistant logo reference: https://github.com/home-assistant/assets/tree/master/logo
