@@ -11,6 +11,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN
+from .dashboard import CARD_PATH, async_register_card
 from .journal import retained_entries
 
 
@@ -20,12 +21,13 @@ async def async_register(hass):
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(
-                "/glucifer/glucifer-card.js",
+                CARD_PATH,
                 str(Path(__file__).parent / "frontend/glucifer-card.js"),
                 False,
             )
         ]
     )
+    await async_register_card(hass)
 
 
 @websocket_api.websocket_command(

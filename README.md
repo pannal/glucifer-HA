@@ -48,6 +48,8 @@ JugglucoNG build noted above.
    notes are opt-in, and history defaults to **7 days**.
 6. Tap **Send test message** in JugglucoNG. Check that HA shows the glucose
    value and measurement time, then tap **Done** in NG.
+7. Refresh your HA browser, edit the dashboard, and choose **Add card > Glucifer HA**.
+   Pick the phone's glucose entity. The card registers automatically.
 
 The phone must be able to reach Home Assistant. **Accept local requests only**
 starts off for new connections. If HA shows only `/api/webhook/...`, prepend
@@ -68,13 +70,15 @@ and dark themes. These are card previews, not captures from a live HA installati
 <details>
 <summary><strong>Add the dashboard card</strong></summary>
 
-Enable advanced mode in your Home Assistant profile, then open
-**Settings > Dashboards > Resources**. Add `/glucifer/glucifer-card.js` as a
-**JavaScript module**. Refresh the browser, edit your dashboard, and choose
-**Add card > Glucifer HA**. Select your phone's glucose entity in the visual
-editor. Its expandable sections control chart length, journal display,
-visible details, glucose ranges, and separate colors for the value and arrow.
-No YAML is needed. Existing manual cards keep working.
+Glucifer registers its card automatically when the integration starts.
+Refresh the browser, edit your dashboard, and choose **Add card > Glucifer HA**.
+Select your phone's glucose entity in the visual editor. Its expandable
+sections control chart length, journal display, visible details, glucose
+ranges, and separate colors for the value and arrow.
+
+Existing resource entries are reused and their versioned URLs update with the
+integration. Existing manual cards keep working. If you manage dashboard
+resources explicitly in YAML, use the [YAML resource setup](docs/guide.md#yaml-dashboard-resources).
 
 The card finds the receiver's other entities automatically. Enable history
 backfill in JugglucoNG to recover up to seven days of retained readings.
@@ -140,8 +144,8 @@ the file's GitHub URL. Both support quiet hours and a cooldown.
 - Works only on Wi-Fi? Use a reachable HTTPS endpoint or VPN and check
   **Accept local requests only** in the integration options.
 - No updates? Verify the full receiver URL and send a test snapshot.
-- Card still looks old? Restart HA after updating, refresh the browser, and
-  change its resource URL to `/glucifer/glucifer-card.js?v=0.3.0` if needed.
+- Card still looks old? Restart HA after updating and refresh the browser.
+  Glucifer updates its resource version automatically for UI-managed resources.
 - Optional entity missing? Enable its field and wait for an accepted snapshot.
 - Replacing a secret? Select **Replace the connection URL** in the options,
   complete the flow, then update the phone's destination with the new QR code.

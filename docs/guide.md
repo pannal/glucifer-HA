@@ -187,13 +187,18 @@ identifiers, glucose values, alert values, journal entries, and measurement time
 The integration includes its dashboard card. It loads no external scripts and
 reads history through your authenticated Home Assistant connection.
 
-1. Enable advanced mode in your Home Assistant profile.
-2. Open **Settings > Dashboards > Resources** and add
-   `/glucifer/glucifer-card.js` as a **JavaScript module**.
-3. Refresh the browser, edit your dashboard, then choose **Add card > Glucifer HA**.
-4. Select the phone's glucose entity. Expand **Display**, **Journal**,
+1. Set up the Glucifer integration and refresh your HA browser.
+2. Edit your dashboard, then choose **Add card > Glucifer HA**.
+3. Select the phone's glucose entity. Expand **Display**, **Journal**,
    **Glucose value colors**, or **Trend arrow colors** to adjust the card.
    Save the card when finished.
+
+The integration automatically registers the card in HA's UI-managed dashboard
+resources. It reuses existing entries, removes duplicates for its own local
+card URL, and updates the version suffix when the integration changes.
+Other cards' resources are preserved. No advanced mode or manual JavaScript
+resource step is needed for this setup. Restart HA after updating the
+integration, then refresh the browser to load the updated card.
 
 The visual editor uses Home Assistant's native controls, including color
 pickers. Existing YAML configurations still work; the smallest example is:
@@ -225,6 +230,22 @@ Either color system can be disabled independently.
 For a complete dashboard, copy [examples/dashboard.yaml](../examples/dashboard.yaml)
 into a new dashboard's raw configuration editor and replace its example entity
 IDs. Refresh the browser after updating the integration's card.
+
+### YAML dashboard resources
+
+If you explicitly manage resources in YAML, that configuration remains
+authoritative. Add this entry to your existing resource list:
+
+```yaml
+- url: /glucifer/glucifer-card.js?v=0.3.1
+  type: module
+```
+
+Reload the YAML resources and refresh the browser. Update the version suffix
+after an integration upgrade if the browser keeps an older card. Glucifer
+does not rewrite YAML files. A dashboard written in YAML can still use
+UI-managed resources; the exception depends on the resource collection's
+mode, not on the dashboard itself.
 
 ## Automation blueprints
 
@@ -398,7 +419,7 @@ expose the phone's HTTP server.
 | Optional entity is missing | Enable that field in JugglucoNG and wait for an accepted snapshot. |
 | Alert becomes unavailable after disabling it | Expected: disabled does not mean the alert condition is false. |
 | Journal does not appear | Update both HA and the phone, enable Sync journal entries, and check the card's journal filters. |
-| Visual editor or arrows are missing | Refresh the browser after updating. If cached, use `/glucifer/glucifer-card.js?v=0.3.0` for the resource URL. |
+| Visual editor or arrows are missing | Restart HA after updating and refresh the browser. Resource versions update automatically; explicitly managed YAML resources need the declaration above. |
 | Source mismatch | The endpoint already belongs to another source. Create a separate receiver entry. |
 
 When reporting a problem, include both software versions and the error code.

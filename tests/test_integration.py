@@ -323,6 +323,16 @@ async def test_history_websocket_and_card_resource(hass, receiver, snapshot, has
     response = await client.get("/glucifer/glucifer-card.js")
     assert response.status == 200
     assert "class GluciferCard" in await response.text()
+    # Setup registers the module, making it discoverable without a manual resource.
+    await ws.send_json({"id": 3, "type": "lovelace/resources"})
+    resources = (await ws.receive_json())["result"]
+    card = next(
+        item for item in resources if item["url"].startswith("/glucifer/glucifer-card.js?v=")
+    )
+    assert card["type"] == "module"
+    response = await client.get(card["url"])
+    assert response.status == 200
+    assert "class GluciferCard" in await response.text()
 
 
 async def test_history_requires_glucose_access_not_diagnostic_entity(

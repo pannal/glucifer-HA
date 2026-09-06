@@ -1,4 +1,5 @@
-# Add /glucifer/glucifer-card.js as a JavaScript module dashboard resource first.
+# Glucifer registers the card automatically for UI-managed resources.
+# For YAML-managed resources, see docs/guide.md#yaml-dashboard-resources.
 # Replace sensor.phone_glucose with your receiver's glucose entity.
 title: Glucifer
 views:
