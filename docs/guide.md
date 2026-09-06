@@ -242,11 +242,13 @@ trigger updates. Normal cadence follows the connected glucose source.
 | Setting | Default | Behavior |
 | --- | --- | --- |
 | Live events bypass the background interval | On | Live events can send with a one-second minimum, independently of background pacing. Turn off to apply the selected interval to live events too. |
-| Background send interval | 1 second | Paces history batches and changed snapshots found by background checks. Pending live updates take priority. |
-| Check after inactivity | 1 hour | Rechecks the data after no successful live push for this period. A successful live push restarts the timer. |
+| Check for missed updates after | 1 hour | Rechecks the data after no successful live push for this period. A successful live push restarts the timer. |
+| Pause between background requests | 1 second | Paces history batches and changed snapshots found by background checks. Pending live updates take priority. |
 
 The timing controls offer 1, 5, 10, 30, 60, 120, 360, 900, and 1800 seconds,
 plus 1, 6, 12, and 24 hours. Existing selected intervals survive upgrades.
+The request pause limits pending work; it does not schedule continuous sends.
+With live bypass off, the screen labels it **Pause between all requests**.
 All requests remain at least one second apart. History waits for its next slot
 without polling every second during a long background interval.
 
