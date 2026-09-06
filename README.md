@@ -3,7 +3,7 @@
 <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png" alt="Glucifer HA: a horned glucose drop with a chart line and insulin pen" width="100%">
 
 Bring [JugglucoNG](https://github.com/ctqvva/JugglucoNG) glucose readings into
-Home Assistant through a private HTTP receiver. Includes mg/dL and mmol/L,
+Home Assistant through a private webhook. Includes mg/dL and mmol/L,
 boolean alert sensors, connection diagnostics, a dashboard card, and optional
 history backfill. No separate server or MQTT broker required.
 
