@@ -19,8 +19,9 @@ yet. Live phone-to-Home-Assistant testing is still pending.
 
 ## Quick setup
 
-Pair with a QR code from Home Assistant. Have HA open on a computer or another
-screen so your phone can scan it. Use the matching JugglucoNG build noted above.
+Connect by scanning a QR code or copying a connection URL. Manual setup works
+on the same phone, without a camera or second screen. Use the matching
+JugglucoNG build noted above.
 
 1. In **HACS > Custom repositories**, add
    `https://github.com/pannal/glucifer-ha` as an **Integration**. Open its
@@ -32,12 +33,13 @@ screen so your phone can scan it. Use the matching JugglucoNG build noted above.
    you do not need to connect a phone first.
 3. In HA, open **Settings > Devices & services > Add integration > Glucifer HA**.
    Name the phone, choose your glucose unit, and submit to activate the connection.
-4. **Display the QR code:** select **Configure** for that phone in HA.
-   The connection is already active. Leave the QR code visible; no further
-   save in HA is needed unless you change its settings.
-5. **Scan it in JugglucoNG:** open **API destinations**, add a **Glucifer HA**
-   destination, and tap **Scan QR Code**. Scan the code, confirm the Home
-   Assistant host, then turn the destination on. NG saves changes automatically.
+4. **Get the connection details:** select **Configure** for that phone in HA.
+   It shows a connection URL and QR code. The connection is already active;
+   no further save in HA is needed unless you change its settings.
+5. In JugglucoNG, open **API destinations** and add a **Glucifer HA** destination.
+   **Manual:** copy the connection URL from HA and paste it into **POST URL**.
+   **QR:** tap **Scan QR Code**, scan from another screen, and confirm the HA host.
+   Turn the destination on. NG saves changes automatically.
 6. Choose what to send. Glucose and measurement time are always enabled;
    trend, delta, and alerts start enabled. Other fields and history backfill
    start disabled. New glucose readings and saved changes trigger updates.
@@ -48,9 +50,8 @@ screen so your phone can scan it. Use the matching JugglucoNG build noted above.
    value and measurement time, then tap **Done** in NG.
 
 The phone must be able to reach Home Assistant. **Accept local requests only**
-starts off for new connections. If you cannot scan the code,
-paste the complete connection URL into the destination instead. If HA shows only
-`/api/webhook/...`, prepend your Home Assistant URL and use manual entry.
+starts off for new connections. If HA shows only `/api/webhook/...`, prepend
+your Home Assistant URL and paste the complete address into **POST URL**.
 Keep the connection URL and QR code private: they contain a secret.
 
 ## Screenshots

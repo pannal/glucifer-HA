@@ -74,8 +74,10 @@ Restart Home Assistant after copying the files.
    another save in HA. If only `/api/webhook/...` is shown, prepend your Home Assistant
    URL and use manual entry.
 4. In the matching JugglucoNG build, open its **API destinations** settings,
-   add a **Glucifer HA** destination, and choose **Scan QR Code** or paste the
-   complete URL. Confirm the destination host after scanning.
+   add a **Glucifer HA** destination. For manual setup, copy the connection URL
+   from HA and paste it into **POST URL**. You can do this on the same phone;
+   no camera or second screen is needed. Alternatively, choose **Scan QR Code**
+   and confirm the destination host after scanning.
 5. Turn the NG destination on and choose the optional fields and alerts.
    Glucose remains enabled. Changes are saved automatically.
 6. Send a test snapshot, check Last success and the glucose value in HA,
