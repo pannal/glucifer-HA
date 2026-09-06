@@ -26,8 +26,8 @@ screen so your phone can scan it. Use the matching JugglucoNG build noted above.
    `https://github.com/pannal/glucifer-ha` as an **Integration**. Enable
    pre-release versions, download Glucifer HA, and restart Home Assistant.
 2. In HA, open **Settings > Devices & services > Add integration > Glucifer HA**.
-   Name the phone, choose your glucose unit, and finish receiver setup.
-3. **Display the QR code:** open that receiver's integration options in HA.
+   Name the phone, choose your glucose unit, and finish setup.
+3. **Display the QR code:** open the integration options for that phone in HA.
    Leave the QR code visible on screen.
 4. **Scan it in JugglucoNG:** open **API destinations**, add a **Glucifer HA**
    destination, and tap **Scan QR Code**. Scan the code, confirm the Home
@@ -39,10 +39,10 @@ screen so your phone can scan it. Use the matching JugglucoNG build noted above.
    value and measurement time.
 
 The phone must be able to reach Home Assistant. **Accept local requests only**
-starts off for new receivers. If you cannot scan the code,
-paste the complete receiver URL into the destination instead. If HA shows only
+starts off for new connections. If you cannot scan the code,
+paste the complete connection URL into the destination instead. If HA shows only
 `/api/webhook/...`, prepend your Home Assistant URL and use manual entry.
-Keep the receiver URL and QR code private: they contain the receiver secret.
+Keep the connection URL and QR code private: they contain a secret.
 
 ## Screenshots
 
@@ -108,9 +108,9 @@ the file's GitHub URL. Both support quiet hours and a cooldown.
   **Accept local requests only** in the integration options.
 - No updates? Verify the full receiver URL and send a test snapshot.
 - Optional entity missing? Enable its field and wait for an accepted snapshot.
-- Replacing a secret? Select **Replace the receiver secret** in the options,
+- Replacing a secret? Select **Replace the connection URL** in the options,
   complete the flow, then update the phone's destination with the new QR code.
-- Adding another phone? Create a separate receiver for each phone.
+- Adding another phone? Add a separate integration entry for each phone.
 
 [Installation](docs/guide.md#installation) ·
 [Remote access](docs/guide.md#access-away-from-home) ·

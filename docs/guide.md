@@ -68,8 +68,8 @@ Restart Home Assistant after copying the files.
 
 1. In Home Assistant, open **Settings > Devices & services > Add integration**
    and search for **Glucifer HA**.
-2. Name the sender, for example `My phone`.
-3. Finish receiver setup. The setup and options screens show its URL and a
+2. Name the phone, for example `My phone`.
+3. Finish setup in Home Assistant. The setup and options screens show its URL and a
    QR code. If only `/api/webhook/...` is shown, prepend your Home Assistant
    URL and use manual entry.
 4. In the matching JugglucoNG build, open its **API destinations** settings,
@@ -238,7 +238,7 @@ JugglucoNG validates scanned URLs and asks you to confirm the host before
 saving. Scanning leaves field selection and history preferences unchanged.
 
 To replace a receiver secret, open the integration's options and select
-**Replace the receiver secret**. The next screen shows the new URL and QR code.
+**Replace the connection URL**. The next screen shows the new URL and QR code.
 Submitting that screen revokes the old URL. Update the existing JugglucoNG
 destination with the new QR code or URL. Entity IDs, source binding, and stored
 readings are preserved. Closing the flow before submitting leaves the old URL

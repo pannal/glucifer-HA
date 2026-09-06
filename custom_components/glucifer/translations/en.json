@@ -3,20 +3,20 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add a JugglucoNG sender",
-        "description": "Choose a name for this sender. Each phone needs its own receiver entry.",
+        "title": "Connect a JugglucoNG phone",
+        "description": "Home Assistant will receive glucose data from JugglucoNG on this phone. Give the phone a name, such as My phone. Add each phone separately.",
         "data": {
-          "name": "Name"
+          "name": "Phone name"
         }
       },
       "receiver": {
-        "title": "Connect JugglucoNG",
-        "description": "Save this receiver, then paste the following URL into a Glucifer HA API destination in JugglucoNG:\n\n`{url}`\n\nIf only a path is shown, prefix it with your Home Assistant URL. Keep the full URL private. Remote access requires a reachable HTTPS endpoint or VPN and local-only reception turned off.\n\nScan in JugglucoNG or copy the URL above:",
+        "title": "Set up the connection",
+        "description": "Finish setup in Home Assistant, then open API destinations in JugglucoNG and add Glucifer HA. Scan the QR code below or paste this connection URL:\n\n`{url}`\n\nIf only a path is shown, add your Home Assistant URL before it. Keep the URL and QR code private. To connect away from home, use a reachable HTTPS address or VPN and leave Accept local requests only turned off.",
         "data": {
           "local_only": "Accept local requests only",
           "stale_seconds": "Mark data unavailable after (seconds)",
           "glucose_unit": "Glucose display unit",
-          "qr_code": "Receiver QR code"
+          "qr_code": "Connection QR code"
         }
       }
     },
@@ -27,21 +27,21 @@
   "options": {
     "step": {
       "init": {
-        "title": "Receiver settings",
-        "description": "Receiver URL (keep private):\n\n`{url}`\n\nIf only a path is shown, prefix it with your Home Assistant URL. Field selection is configured in the JugglucoNG sender. Removing this integration revokes its URL.\n\nScan in JugglucoNG or copy the URL above:",
+        "title": "Phone connection settings",
+        "description": "In JugglucoNG, open the Glucifer HA destination under API destinations. Scan the QR code below or paste this connection URL:\n\n`{url}`\n\nIf only a path is shown, add your Home Assistant URL before it. Choose which data to send in JugglucoNG. Keep the URL and QR code private. Removing this integration entry disconnects this phone.",
         "data": {
           "local_only": "Accept local requests only",
           "stale_seconds": "Mark data unavailable after (seconds)",
           "glucose_unit": "Glucose display unit",
-          "rotate_secret": "Replace the receiver secret",
-          "qr_code": "Receiver QR code"
+          "rotate_secret": "Replace the connection URL",
+          "qr_code": "Connection QR code"
         }
       },
       "rotate": {
-        "title": "Replace receiver URL",
-        "description": "Save this new URL, then submit to revoke the old URL. Update the existing JugglucoNG destination after submitting. Entities and stored readings are preserved.\n\n`{url}`",
+        "title": "Replace the connection URL",
+        "description": "Submit to activate this new connection URL and disable the old one. Then update the Glucifer HA destination in JugglucoNG using the QR code below or this URL. Your entities and stored readings are kept.\n\n`{url}`\n\nKeep the URL and QR code private.",
         "data": {
-          "qr_code": "Receiver QR code"
+          "qr_code": "Connection QR code"
         }
       }
     }
