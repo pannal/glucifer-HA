@@ -120,7 +120,7 @@ async def test_config_flow(hass):
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
     assert result["step_id"] == "user"
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"name": "Phone"})
-    assert result["step_id"] == "receiver"
+    assert result["step_id"] == "save_connection"
     assert result["data_schema"]({})["local_only"] is False
     # Pairing must not expose a URL before saving activates the webhook.
     assert not result.get("description_placeholders")
@@ -349,7 +349,10 @@ async def test_old_storage_format_migrates_without_losing_reading(hass, receiver
     assert entry.runtime_data.last_contact_ms is None
 
 
-async def test_pairing_qr_accepts_data_without_submitting_options(hass, hass_client, snapshot):
+@pytest.mark.parametrize("setup_method", ["qr", "manual"])
+async def test_pairing_accepts_data_without_submitting_options(
+    hass, hass_client, snapshot, setup_method
+):
     from urllib.parse import urlsplit
 
     from homeassistant.helpers.selector import QrCodeSelector
@@ -366,15 +369,16 @@ async def test_pairing_qr_accepts_data_without_submitting_options(hass, hass_cli
     options = await hass.config_entries.options.async_init(result["result"].entry_id)
     qr = next(v for v in options["data_schema"].schema.values() if isinstance(v, QrCodeSelector))
     assert qr.config["data"] == options["description_placeholders"]["url"]
+    url = qr.config["data"] if setup_method == "qr" else options["description_placeholders"]["url"]
     client = await hass_client()
-    response = await client.post(urlsplit(qr.config["data"]).path, json=snapshot)
+    response = await client.post(urlsplit(url).path, json=snapshot)
     assert response.status == 200
     assert (await response.json())["status"] == "accepted"
     await hass.async_block_till_done()
     assert hass.states.get("sensor.phone_glucose").state == "123"
     hass.config_entries.options.async_abort(options["flow_id"])
     snapshot["sequence"] += 1
-    response = await client.post(urlsplit(qr.config["data"]).path, json=snapshot)
+    response = await client.post(urlsplit(url).path, json=snapshot)
     assert (await response.json())["status"] == "accepted"
 
 
@@ -394,3 +398,20 @@ async def test_measurements_round_to_one_decimal(hass, receiver, snapshot):
     snapshot["fields"]["iob_u"] = 1.234568
     await send(hass, client, snapshot)
     assert float(hass.states.get("sensor.phone_insulin_on_board").state) == 1.2
+
+
+async def test_setup_translation_does_not_reuse_old_url_template(hass):
+    from homeassistant.helpers.translation import async_get_translations
+
+    flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"name": "Phone"})
+    translations = await async_get_translations(hass, "en", "config", {DOMAIN})
+    # An older browser may still have this QR-step translation cached.
+    old_key = "component.glucifer.config.step.receiver.description"
+    translations[old_key] = "Scan the QR code or paste this URL: {url}"
+    key = f"component.glucifer.config.step.{flow['step_id']}.description"
+    assert key != old_key
+    description = translations[key].format(**(flow.get("description_placeholders") or {}))
+    assert "Configure" in description
+    assert "connection URL" in description
+    assert "{url}" not in description

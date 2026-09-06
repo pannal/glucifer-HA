@@ -51,7 +51,7 @@ class JugglucoFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     errors={"name": "name_required"},
                 )
             self._webhook_id = webhook.async_generate_id()
-            return await self.async_step_receiver()
+            return await self.async_step_save_connection()
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
@@ -61,7 +61,7 @@ class JugglucoFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
         )
 
-    async def async_step_receiver(self, user_input=None):
+    async def async_step_save_connection(self, user_input=None):
         if user_input is not None:
             return self.async_create_entry(
                 title=self._name,
@@ -69,7 +69,8 @@ class JugglucoFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 options={key: value for key, value in user_input.items() if key != "qr_code"},
             )
         return self.async_show_form(
-            step_id="receiver",
+            # Use a distinct key from the old QR step, whose cached text requires a URL.
+            step_id="save_connection",
             data_schema=schema(),
         )
 

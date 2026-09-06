@@ -9,14 +9,13 @@
           "name": "Phone name"
         }
       },
-      "receiver": {
-        "title": "Save the phone connection",
-        "description": "Choose your settings and submit this form to activate the connection. Then open Configure for this phone on the Glucifer HA integration page to display its QR code.\n\nTo connect away from home, use a reachable HTTPS address or VPN and leave Accept local requests only turned off.",
+      "save_connection": {
+        "title": "Activate the phone connection",
+        "description": "Choose your settings and select Submit to activate the connection. Then open Configure for this phone on the Glucifer HA integration page to copy its connection URL or scan its QR code.\n\nTo connect away from home, use a reachable HTTPS address or VPN and leave Accept local requests only turned off.",
         "data": {
           "local_only": "Accept local requests only",
           "stale_seconds": "Mark data unavailable after (seconds)",
-          "glucose_unit": "Glucose display unit",
-          "qr_code": "Connection QR code"
+          "glucose_unit": "Glucose display unit"
         }
       }
     },
@@ -28,7 +27,7 @@
     "step": {
       "init": {
         "title": "Phone connection settings",
-        "description": "This connection is ready to receive data. In JugglucoNG, open API destinations, add Glucifer HA, and scan the QR code below or paste this connection URL:\n\n`{url}`\n\nTurn the destination on and choose which data to send. JugglucoNG saves changes automatically. Tap Send test message and check Last success, then tap Done.\n\nYou can close this HA dialog after scanning. Submit only if you changed the settings below. If only a URL path is shown, add your Home Assistant URL before it. Keep the URL and QR code private.",
+        "description": "This connection is ready to receive data. In JugglucoNG, open API destinations, add Glucifer HA, and scan the QR code below or paste this connection URL into POST URL:\n\n`{url}`\n\nTurn the destination on and choose which data to send. JugglucoNG saves changes automatically. Tap Send test message and check Last success, then tap Done.\n\nYou can close this HA dialog after scanning. Submit only if you changed the settings below. If only a URL path is shown, add your Home Assistant URL before it. Keep the URL and QR code private.",
         "data": {
           "local_only": "Accept local requests only",
           "stale_seconds": "Mark data unavailable after (seconds)",
