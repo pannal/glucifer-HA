@@ -11,6 +11,7 @@ async function loadNativeChart(page) {
   await page.route('http://glucifer.test/**', async route => {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname === '/') return route.fulfill({contentType:'text/html',body:'<body></body>'});
+    if (pathname === '/glucifer/icon.png') return route.fulfill({contentType:'image/png',path:path.join(__dirname,'../../custom_components/glucifer/brand/icon.png')});
     const file = path.join(base, pathname);
     let body = fs.readFileSync(file);
     if (path.basename(file) === app) {

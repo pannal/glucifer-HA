@@ -80,6 +80,8 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
         const card = document.querySelector('glucifer-card');
         return card.data && !card.loading && card.chartElement?.chart?.getOption().series?.length === 4;
       });
+      await page.clock.runFor(200);
+      await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.brand-logo').naturalWidth > 0);
       await page.locator('main').screenshot({
         path: path.join(__dirname, dark ? 'dashboard-mmol-interactive.png' : 'dashboard-mgdl-interactive.png'),
       });

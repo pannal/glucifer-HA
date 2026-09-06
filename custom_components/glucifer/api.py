@@ -24,7 +24,12 @@ async def async_register(hass):
                 CARD_PATH,
                 str(Path(__file__).parent / "frontend/glucifer-card.js"),
                 False,
-            )
+            ),
+            StaticPathConfig(
+                "/glucifer/icon.png",
+                str(Path(__file__).parent / "brand/icon.png"),
+                False,
+            ),
         ]
     )
     await async_register_card(hass)

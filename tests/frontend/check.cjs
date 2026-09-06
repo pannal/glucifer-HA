@@ -4,6 +4,10 @@ const path = require('node:path');
 (async () => {
   const browser = await chromium.launch({headless:true});
   const page = await browser.newPage({viewport:{width:640,height:720},timezoneId:'UTC'});
+  await page.route('http://glucifer.test/**', route => new URL(route.request().url()).pathname === '/glucifer/icon.png'
+    ? route.fulfill({contentType:'image/png',path:path.join(__dirname,'../../custom_components/glucifer/brand/icon.png')})
+    : route.fulfill({contentType:'text/html',body:'<body></body>'}));
+  await page.goto('http://glucifer.test/');
   await page.clock.install({time:new Date('2026-09-06T12:00:00Z')});
   await page.clock.pauseAt(new Date('2026-09-06T12:00:00Z'));
   const errors=[];page.on('pageerror', error=>errors.push(String(error)));
@@ -34,7 +38,7 @@ const path = require('node:path');
   assert.equal(await root.locator('.summary').textContent(),'Δ 0.0 mg/dL · Reading 1m 0s old');
   await page.evaluate(()=>{window.fixture.states['sensor.phone_trend'].state='Flat';document.querySelector('glucifer-card').hass=window.fixture;});
   assert.equal((await root.locator('path').getAttribute('d')).match(/M/g).length,2);
-  assert.equal(await root.locator('img').count(),0);
+  assert.equal(await root.locator('img:not(.brand-logo)').count(),0);
   await root.locator('ha-card > button').click();assert.equal(await page.evaluate(()=>window.moreInfo),'sensor.phone_glucose');
   if (process.env.GLUCIFER_SCREENSHOT) await page.screenshot({path:process.env.GLUCIFER_SCREENSHOT});
   await page.evaluate(()=>{window.fixture.states['sensor.phone_glucose']={state:'6.8',attributes:{unit_of_measurement:'mmol/L'}};window.fixture.states['binary_sensor.phone_stale'].state='on';document.querySelector('glucifer-card').hass=window.fixture;});
@@ -88,7 +92,28 @@ const path = require('node:path');
   await root.locator('circle.journal-marker').click();
   assert.match(await root.locator('.journal-selection').textContent(), /25 g/);
   assert.match(await root.locator('.journal-selection').textContent(), /<img src=x/);
-  assert.equal(await root.locator('img').count(),0);
+  assert.equal(await root.locator('img:not(.brand-logo)').count(),0);
+  // Native details remembers the browser's choice across a newly created card.
+  assert.equal(await root.locator('.journal-section').getAttribute('open'),'');
+  assert.equal(await root.locator('.journal-list button').first().evaluate(el=>getComputedStyle(el).borderTopWidth),'0px');
+  const compactHeight=(await root.locator('.journal-section').boundingBox()).height;
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.journal_compact=false;card.render();});
+  assert.ok((await root.locator('.journal-section').boundingBox()).height>compactHeight);
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.journal_compact=true;card.render();});
+  await root.locator('.journal-section summary').click();
+  await page.waitForFunction(()=>localStorage.getItem(document.querySelector('glucifer-card').journalStorageKey)==='closed');
+  await page.evaluate(()=>{
+    const old=document.querySelector('glucifer-card'),config=old.config;
+    old.remove();const card=document.createElement('glucifer-card');document.body.append(card);
+    card.setConfig(config);card.hass=window.fixture;
+  });
+  await page.waitForFunction(()=>document.querySelector('glucifer-card').data && !document.querySelector('glucifer-card').loading);
+  assert.equal(await root.locator('.journal-section').getAttribute('open'),null);
+  await page.evaluate(()=>{document.querySelector('glucifer-card').hass=window.fixture;});
+  assert.equal(await root.locator('.journal-list').isVisible(),false);
+  await root.locator('.journal-section summary').click();
+  await page.waitForFunction(()=>localStorage.getItem(document.querySelector('glucifer-card').journalStorageKey)==='open');
+  await root.locator('circle.journal-marker').click();
   // Unrelated HA traffic must neither redraw the card nor dismiss journal details.
   await page.evaluate(() => {
     const card=document.querySelector('glucifer-card');
@@ -215,6 +240,29 @@ const path = require('node:path');
   assert.equal(await root.locator('.glucose').textContent(),'139');
   await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_glucose_unit=true;card.render();});
   assert.equal(await root.locator('.glucose').textContent(),'139 mg/dL');
+  // Size and logo controls retain the title/value layout, including double arrows.
+  assert.equal(form.defaults.arrow_size,96);
+  assert.equal(form.defaults.show_logo,true);
+  assert.equal(form.defaults.journal_compact,true);
+  await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.brand-logo').naturalWidth>0);
+  assert.equal(await root.locator('img').count(),1);
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_logo=false;card.render();});
+  assert.equal(await root.locator('.brand-logo').isVisible(),false);
+  await page.setViewportSize({width:800,height:900});
+  for(const size of [24,96,160]) {
+    await page.evaluate(size=>{const card=document.querySelector('glucifer-card');card.config.arrow_size=size;card.render();},size);
+    assert.equal(await root.locator('.trend').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)),size);
+  }
+  for(const width of [360,280]) {
+    await page.setViewportSize({width,height:900});
+    for(const trend of ['DoubleUp','DoubleDown','FortyFiveDown']) {
+      await page.evaluate(trend=>{window.fixture.states['sensor.phone_trend'].state=trend;document.querySelector('glucifer-card').hass=window.fixture;},trend);
+      const a=await root.locator('.trend').boundingBox(),g=await root.locator('.glucose').boundingBox();
+      assert.ok(a.x>=g.x+g.width && a.x+a.width<=width);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    }
+  }
+  assert.equal(await page.evaluate(()=>{try{customElements.get('glucifer-card').getConfigForm().assertConfig({arrow_size:200});return false;}catch{return true;}}),true);
   // An entity change during an outstanding request must fetch the new entity.
   await page.evaluate(()=>{
     const card=document.querySelector('glucifer-card');

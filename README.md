@@ -63,7 +63,7 @@ and dark themes. These are card previews, not captures from a live HA installati
 
 | mg/dL with journal markers and history | mmol/L with journal markers and history |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png?v=0.4.1" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png?v=0.4.1" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
 
 ## Setup details
 
@@ -101,10 +101,12 @@ carbohydrate entries sync when created, edited, or deleted, without waiting
 for a glucose reading. **Include notes and note entries** is a separate opt-in.
 Choose how much history to send, from 1 to 90 days; the default is 7 days.
 
-The card shows **▲ insulin**, **● carbohydrates**, and **■ notes** on the
-chart. Select a point for its details. In the visual editor's **Journal**
+The chart shows journal chips with colored icons and amounts. Select a chip
+or its point for details. In the visual editor's **Journal**
 section, enable the optional history list, choose entry types and days,
-and set its maximum length (25 entries by default).
+and set its maximum length (25 entries by default). **Compact journal list**
+is enabled by default; turn it off for padded, bordered rows. Click the
+**Journal** heading to collapse the list. Your browser remembers that choice.
 
 Turning off journal sync clears the copy in HA after the phone's next
 successful journal request. Hiding the list only changes the card's display.

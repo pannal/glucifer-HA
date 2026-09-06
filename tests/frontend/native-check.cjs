@@ -38,7 +38,22 @@ const {loadNativeChart} = require('./ha-native.cjs');
     await page.mouse.click(marker.x,marker.y);
     assert.equal(await root.locator('.journal-selection').isVisible(),true);
     assert.match(await root.locator('.journal-selection').textContent(),/25 g/);
-    assert.equal(await root.locator('img').count(),0);
+    assert.equal(await root.locator('img:not(.brand-logo)').count(),0);
+    // The rendered chip itself opens details, just like its underlying marker.
+    await root.locator('.journal-selection button').click();
+    const chip=await page.evaluate(()=>{
+      const chart=document.querySelector('glucifer-card').chartElement;
+      const symbol=chart.chart.getModel().getSeriesByIndex(2).getData().getItemGraphicEl(0);
+      let label=symbol.getTextContent();
+      symbol.traverse?.(item=>{if(item.getTextContent?.())label=item.getTextContent();});
+      const rect=label.getBoundingRect(),m=label.getComputedTransform()||[1,0,0,1,0,0];
+      const x=rect.x+rect.width/2,y=rect.y+rect.height/2;
+      const canvas=chart.shadowRoot.querySelector('canvas').getBoundingClientRect();
+      return {x:canvas.left+m[0]*x+m[2]*y+m[4],y:canvas.top+m[1]*x+m[3]*y+m[5],text:label.style.text};
+    });
+    assert.match(chip.text,/25 g/);
+    await page.mouse.click(chip.x,chip.y);
+    assert.equal(await root.locator('.journal-selection').isVisible(),true);
     // Pointer inspection has a localized timestamp and units.
     await page.mouse.move(marker.x-20,marker.y+10);
     await page.clock.runFor(100);

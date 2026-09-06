@@ -3,6 +3,7 @@
 
 from copy import deepcopy
 from datetime import timedelta
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -323,6 +324,13 @@ async def test_history_websocket_and_card_resource(hass, receiver, snapshot, has
     response = await client.get("/glucifer/glucifer-card.js")
     assert response.status == 200
     assert "class GluciferCard" in await response.text()
+    logo = await client.get("/glucifer/icon.png")
+    assert logo.status == 200
+    assert logo.content_type == "image/png"
+    assert (
+        await logo.read()
+        == (Path(__file__).parents[1] / "custom_components/glucifer/brand/icon.png").read_bytes()
+    )
     # Setup registers the module, making it discoverable without a manual resource.
     await ws.send_json({"id": 3, "type": "lovelace/resources"})
     resources = (await ws.receive_json())["result"]

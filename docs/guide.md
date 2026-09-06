@@ -221,7 +221,11 @@ are unavailable are omitted. Existing `show_details: false` and
 `show_lifecycle: false` YAML settings remain supported.
 
 The main value stays on the left, with a larger trend arrow on the right.
-**Show glucose unit**, enabled by default, controls the unit beside that value.
+Under **Display**, **Arrow size (px)** controls its size from 24 to 160 pixels;
+the default is 96. It scales down on narrow cards to leave room for the value.
+**Show logo**, enabled by default, displays the bundled Glucifer icon at the
+right of the title. **Show glucose unit**, also enabled by default, controls
+the unit beside the main value.
 Chart and detail units stay visible. Reading age shows seconds from the original
 measurement time. Only that label updates every second; unrelated HA state
 changes do not redraw the chart or request history. Journal details stay open
@@ -235,7 +239,15 @@ The card reuses HA's native chart component with Glucifer's stored readings.
 Hover to inspect values, hold Ctrl (Command on Mac) while scrolling to zoom,
 drag to pan, and use HA's reset control to restore the full window. Touch
 screens support pinch zoom. Journal markers remain selectable while zoomed.
+Colored chips show insulin units, carbohydrate grams, or the note label, with connector lines to their
+points. Nearby chips are staggered; crowded labels are hidden when they cannot
+fit, while their points remain available. Zoom in to see more labels.
 If HA's chart module cannot load, a basic chart remains available.
+
+Under **Journal**, **Compact journal list** is enabled by default. Turn it off
+to restore padded, bordered rows. The **Journal** heading expands or collapses
+the list in either mode. Your browser remembers the choice for that receiver
+and dashboard view. It does not change journal sync or chart markers.
 
 The glucose value and trend arrow have separate color controls. Default
 value boundaries are **54, 70, 180, and 250 mg/dL**: dark red below 54, red
@@ -258,7 +270,7 @@ If you explicitly manage resources in YAML, that configuration remains
 authoritative. Add this entry to your existing resource list:
 
 ```yaml
-- url: /glucifer/glucifer-card.js?v=0.4.0
+- url: /glucifer/glucifer-card.js?v=0.4.1
   type: module
 ```
 
