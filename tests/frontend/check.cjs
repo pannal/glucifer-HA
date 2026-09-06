@@ -4,8 +4,8 @@ const path = require('node:path');
 (async () => {
   const browser = await chromium.launch({headless:true});
   const page = await browser.newPage({viewport:{width:640,height:720},timezoneId:'UTC'});
-  await page.route('http://glucifer.test/**', route => new URL(route.request().url()).pathname === '/glucifer/icon.png'
-    ? route.fulfill({contentType:'image/png',path:path.join(__dirname,'../../custom_components/glucifer/brand/icon.png')})
+  await page.route('http://glucifer.test/**', route => new URL(route.request().url()).pathname === '/glucifer/mark.svg'
+    ? route.fulfill({contentType:'image/svg+xml',path:path.join(__dirname,'../../custom_components/glucifer/brand/mark.svg')})
     : route.fulfill({contentType:'text/html',body:'<body></body>'}));
   await page.goto('http://glucifer.test/');
   await page.clock.install({time:new Date('2026-09-06T12:00:00Z')});
@@ -37,7 +37,7 @@ const path = require('node:path');
   assert.equal(await root.locator('.trend').textContent(),'');
   assert.equal(await root.locator('.summary').textContent(),'Δ 0.0 mg/dL · Reading 1m 0s old');
   await page.evaluate(()=>{window.fixture.states['sensor.phone_trend'].state='Flat';document.querySelector('glucifer-card').hass=window.fixture;});
-  assert.equal((await root.locator('path').getAttribute('d')).match(/M/g).length,2);
+  assert.equal((await root.locator('.history-chart path').getAttribute('d')).match(/M/g).length,2);
   assert.equal(await root.locator('img:not(.brand-logo)').count(),0);
   await root.locator('ha-card > button').click();assert.equal(await page.evaluate(()=>window.moreInfo),'sensor.phone_glucose');
   if (process.env.GLUCIFER_SCREENSHOT) await page.screenshot({path:process.env.GLUCIFER_SCREENSHOT});
@@ -196,12 +196,12 @@ const path = require('node:path');
   await page.waitForFunction(()=>!document.querySelector('glucifer-card').loading);
   assert.equal(await root.locator('.glucose').evaluate(el=>el.style.color),'rgb(1, 2, 3)');
   assert.equal(await root.locator('.trend').evaluate(el=>el.style.color),'rgb(4, 5, 6)');
-  assert.equal(await root.locator('svg').isVisible(),false);
+  assert.equal(await root.locator('.history-chart').isVisible(),false);
   assert.equal(await root.locator('.journal-list button').count(),1);
   await page.setViewportSize({width:360,height:740});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   // Every sender field has a matching display control, including sensor identity.
-  for (const key of ['trend','delta_mgdl','rate_mgdl_min','raw_mgdl','auto_mgdl','iob_u','cob_g','battery_percent','sensor_id','sensor_generation','sensor_started_ms','sensor_expires_ms','sensor_warmup']) {
+  for (const key of ['trend','delta_mgdl','rate_mgdl_min','raw_mgdl','auto_mgdl','iob_u','eiob_u','cob_g','battery_percent','sensor_id','sensor_generation','sensor_started_ms','sensor_expires_ms','sensor_warmup']) {
     assert.ok(fields.find(field=>field.name===`show_${key}`)?.selector.boolean);
   }
   await page.evaluate(()=>{
@@ -241,7 +241,7 @@ const path = require('node:path');
   await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_glucose_unit=true;card.render();});
   assert.equal(await root.locator('.glucose').textContent(),'139 mg/dL');
   // Size and logo controls retain the title/value layout, including double arrows.
-  assert.equal(form.defaults.arrow_size,96);
+  assert.equal(form.defaults.arrow_size,84);
   assert.equal(form.defaults.show_logo,true);
   assert.equal(form.defaults.journal_compact,true);
   await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.brand-logo').naturalWidth>0);
@@ -249,7 +249,7 @@ const path = require('node:path');
   await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_logo=false;card.render();});
   assert.equal(await root.locator('.brand-logo').isVisible(),false);
   await page.setViewportSize({width:800,height:900});
-  for(const size of [24,96,160]) {
+  for(const size of [24,84,160]) {
     await page.evaluate(size=>{const card=document.querySelector('glucifer-card');card.config.arrow_size=size;card.render();},size);
     assert.equal(await root.locator('.trend').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)),size);
   }
@@ -263,6 +263,34 @@ const path = require('node:path');
     }
   }
   assert.equal(await page.evaluate(()=>{try{customElements.get('glucifer-card').getConfigForm().assertConfig({arrow_size:200});return false;}catch{return true;}}),true);
+  // Size/alignment are native editor controls. SVG arrows share geometry and rotate about their center.
+  await page.setViewportSize({width:800,height:900});
+  for (const size of [24,42,72,96]) {
+    await page.evaluate(size=>{const card=document.querySelector('glucifer-card');card.config.glucose_size=size;card.render();},size);
+    assert.equal(await root.locator('.glucose').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)),size);
+  }
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.glucose_alignment='center';card.render();});
+  assert.equal(await root.locator('.glucose').evaluate(el=>getComputedStyle(el).textAlign),'center');
+  const shapes=[];
+  for(const [trend,angle] of [['Flat',0],['FortyFiveUp',-45],['SingleUp',-90],['FortyFiveDown',45],['SingleDown',90]]) {
+    await page.evaluate(trend=>{window.fixture.states['sensor.phone_trend'].state=trend;document.querySelector('glucifer-card').hass=window.fixture;},trend);
+    shapes.push(await root.locator('.trend path').getAttribute('d'));
+    assert.equal(await root.locator('.trend path').getAttribute('transform'),`rotate(${angle} 50 50)`);
+    const a=await root.locator('.trend svg').boundingBox(),g=await root.locator('.glucose').boundingBox();
+    assert.ok(Math.abs(a.y+a.height/2-g.y-g.height/2)<1,'Arrow and glucose boxes share a vertical center');
+  }
+  assert.equal(new Set(shapes).size,1);
+  await page.evaluate(()=>{
+    const card=document.querySelector('glucifer-card');card.config.show_iob_u=true;
+    Object.assign(card.data.entities,{eiob_u:'sensor.eiob'});
+    window.fixture.states['sensor.eiob']={state:'0.0',attributes:{unit_of_measurement:'U'}};
+    card.config.show_eiob_u=true;card.render();
+  });
+  assert.match(await root.locator('.optional-values').textContent(),/Insulin on board: .* \(Active: 0.0 U\)/);
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_eiob_u=false;card.render();});
+  assert.doesNotMatch(await root.locator('.optional-values').textContent(),/Active:/);
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_eiob_u=true;window.fixture.states['sensor.eiob'].state='unavailable';card.render();});
+  assert.doesNotMatch(await root.locator('.optional-values').textContent(),/Active:/);
   // An entity change during an outstanding request must fetch the new entity.
   await page.evaluate(()=>{
     const card=document.querySelector('glucifer-card');

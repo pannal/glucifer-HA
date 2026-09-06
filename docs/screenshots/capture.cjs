@@ -11,7 +11,7 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({
-      viewport: { width: 680, height: 980 }, deviceScaleFactor: 2,
+      viewport: { width: 528, height: 1100 }, deviceScaleFactor: 2,
       locale: 'en-GB', timezoneId: 'UTC',
     });
     await loadNativeChart(page);
@@ -37,8 +37,13 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
       }
     }));
     await page.addScriptTag({ path: path.join(__dirname, '../../custom_components/glucifer/frontend/glucifer-card.js') });
-    for (const dark of [false, true]) {
-      await page.evaluate(dark => {
+    for (const variant of [
+      {dark:false, name:'dashboard-mgdl-interactive', config:{}},
+      {dark:true, name:'dashboard-mmol-interactive', config:{}},
+      {dark:true, name:'dashboard-centered-active-insulin', config:{glucose_size:64,glucose_alignment:'center',show_glucose_unit:false,show_eiob_u:true}},
+      {dark:false, name:'dashboard-expanded-journal', config:{glucose_size:48,arrow_size:64,journal_compact:false,show_logo:false}},
+    ]) {
+      await page.evaluate(({dark,config}) => {
         document.documentElement.dataset.theme = dark ? "dark" : "light";
         document.querySelector("glucifer-card").replaceWith(document.createElement("glucifer-card"));
         const colors = dark ? ['#111820', '#1c2631', '#edf2f7', '#aab7c4', '#65cbd1', '#ffb74d', '#344353']
@@ -53,7 +58,7 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
         const unit = dark ? 'mmol/L' : 'mg/dL';
         const entities = { glucose: 'sensor.sample_glucose', trend: 'sensor.sample_trend',
           delta_mgdl: 'sensor.sample_delta', reading_age: 'sensor.sample_age', measurement_time:'sensor.sample_measurement_time',
-          connected: 'binary_sensor.sample_connected', stale: 'binary_sensor.sample_stale' };
+          connected: 'binary_sensor.sample_connected', stale: 'binary_sensor.sample_stale', iob_u:'sensor.sample_iob', eiob_u:'sensor.sample_eiob', cob_g:'sensor.sample_cob' };
         const readings = Array.from({ length: 361 }, (_, i) => ({
           time_ms: now - (360 - i) * 60000 - 42000,
           mgdl: Math.round(115 + 15 * Math.sin(i / 40) + 7 * Math.sin(i / 17)),
@@ -68,26 +73,29 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
         const fixture = {locale:{language:"en-GB",time_format:"24",date_format:"DMY",time_zone:"server"},config:{time_zone:"Europe/Berlin"},localize:key=>key, states: {
           [entities.glucose]: state(dark ? (123 / 18.016).toFixed(1) : '123', { unit_of_measurement: unit }),
           [entities.trend]: state('FortyFiveDown'),
+          [entities.iob_u]: state('5.2',{unit_of_measurement:'U'}),
+          [entities.eiob_u]: state('1.7',{unit_of_measurement:'U'}),
+          [entities.cob_g]: state('0',{unit_of_measurement:'g'}),
           [entities.delta_mgdl]: state('0', { unit_of_measurement: unit }),
           [entities.reading_age]: state('42'), [entities.measurement_time]:state(new Date(now-42000).toISOString()),
           [entities.connected]: state('on'), [entities.stale]: state('off'),
         }, callWS: async () => ({ entities, unit, readings, journal, journal_enabled:true, journal_history_days:7 }) };
         const card = document.querySelector('glucifer-card');
         card.hass = fixture;
-        card.setConfig({ entity: entities.glucose, title: 'Glucose', hours: 6, show_journal:true, journal_limit:4 });
-      }, dark);
+        card.setConfig({ entity: entities.glucose, title: 'Glucose', hours: 6, show_journal:true, journal_limit:4, ...config });
+      }, variant);
       await page.waitForFunction(() => {
         const card = document.querySelector('glucifer-card');
         return card.data && !card.loading && card.chartElement?.chart?.getOption().series?.length === 4;
       });
       await page.clock.runFor(200);
-      await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.brand-logo').naturalWidth > 0);
+      await page.waitForFunction(()=>{const logo=document.querySelector('glucifer-card').shadowRoot.querySelector('.brand-logo');return logo.hidden || logo.naturalWidth > 0;});
       await page.locator('main').screenshot({
-        path: path.join(__dirname, dark ? 'dashboard-mmol-interactive.png' : 'dashboard-mgdl-interactive.png'),
+        path: path.join(__dirname, `${variant.name}.png`),
       });
     }
     if (errors.length) throw new Error(errors.join('\n'));
-    console.log('Captured both dashboard previews from the bundled card using synthetic data.');
+    console.log('Captured four dashboard previews from the bundled card using synthetic data.');
   } finally {
     await browser.close();
   }

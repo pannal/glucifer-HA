@@ -26,6 +26,11 @@ async def async_register(hass):
                 False,
             ),
             StaticPathConfig(
+                "/glucifer/mark.svg",
+                str(Path(__file__).parent / "brand/mark.svg"),
+                False,
+            ),
+            StaticPathConfig(
                 "/glucifer/icon.png",
                 str(Path(__file__).parent / "brand/icon.png"),
                 False,

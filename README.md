@@ -1,6 +1,6 @@
 # Glucifer for Home Assistant
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/v0.2.1/docs/brand/banner.png" alt="Glucifer HA: horned glucose drop and insulin pen beside the Home Assistant icon and Glucifer HA lettering" width="100%">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png?v=0.5.0" alt="Glucifer HA: horned glucose drop and insulin pen beside the Home Assistant icon and Glucifer HA lettering" width="100%">
 
 Bring [JugglucoNG](https://github.com/ctqvva/JugglucoNG) glucose readings into
 Home Assistant through a private webhook. Includes mg/dL and mmol/L,
@@ -63,7 +63,18 @@ and dark themes. These are card previews, not captures from a live HA installati
 
 | mg/dL with journal markers and history | mmol/L with journal markers and history |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png?v=0.4.1" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png?v=0.4.1" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png?v=0.5.0" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png?v=0.5.0" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
+
+<details>
+<summary><strong>More card layouts</strong></summary>
+
+| Centered value, hidden unit and active insulin | Smaller arrow, expanded journal and hidden logo |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-centered-active-insulin.png?v=0.5.0" alt="Dark card with a centered 6.8 glucose value and Insulin on board: 5.2 U (Active: 1.7 U)" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-expanded-journal.png?v=0.5.0" alt="Light card with a larger 123 mg/dL value, a smaller trend arrow and padded journal rows" width="400"> |
+
+These options are available in the card's visual editor.
+
+</details>
 
 ## Setup details
 
@@ -73,7 +84,7 @@ and dark themes. These are card previews, not captures from a live HA installati
 Glucifer registers its card automatically when the integration starts.
 Refresh the browser, edit your dashboard, and choose **Add card > Glucifer HA**.
 Select your phone's glucose entity in the visual editor. Its expandable
-sections control chart length, journal display, visible details, glucose
+sections control glucose size and alignment, chart length, journal display, visible details, glucose
 ranges, and separate colors for the value and arrow.
 
 Existing resource entries are reused and their versioned URLs update with the
@@ -83,8 +94,15 @@ resources explicitly in YAML, use the [YAML resource setup](docs/guide.md#yaml-d
 The card finds the receiver's other entities automatically. Enable history
 backfill in JugglucoNG to recover up to seven days of retained readings.
 The chart uses HA’s hover, zoom, and reset controls. Reading age shows seconds;
-the larger trend arrow sits on the right. **Show glucose unit** hides or shows
-the unit beside the main value.
+the trend arrow sits on the right. **Arrow size** defaults to 84 px; all
+single arrows use the same SVG shape. **Glucose font size** defaults to 42 px.
+**Glucose alignment** can be left or center. **Show glucose unit** controls
+the unit beside the main value. Large sizes scale down on narrow cards.
+
+For eIOB, enable **Show effective IOB (eIOB)** in NG's Glucifer destination
+and **Active insulin (eIOB)** in the card editor. With IOB visible, the card
+shows `Insulin on board: 5.2 U (Active: 1.7 U)`. Both switches default to off;
+this requires the NG sender with eIOB support and Glucifer 0.5.0 or later.
 
 Imported readings appear in this card; they do not rewrite HA Recorder history.
 
@@ -102,7 +120,8 @@ for a glucose reading. **Include notes and note entries** is a separate opt-in.
 Choose how much history to send, from 1 to 90 days; the default is 7 days.
 
 The chart shows journal chips with colored icons and amounts. Select a chip
-or its point for details. In the visual editor's **Journal**
+or its point for details; select it again to close them. Hovering a journal
+entry hides the glucose tooltip. In the visual editor's **Journal**
 section, enable the optional history list, choose entry types and days,
 and set its maximum length (25 entries by default). **Compact journal list**
 is enabled by default; turn it off for padded, bordered rows. Click the

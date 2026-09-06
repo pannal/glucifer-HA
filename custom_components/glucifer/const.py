@@ -16,6 +16,7 @@ FIELDS = {
     "raw_mgdl": ("Raw glucose", "mg/dL", "number"),
     "auto_mgdl": ("Automatically calibrated glucose", "mg/dL", "number"),
     "iob_u": ("Insulin on board", "U", "number"),
+    "eiob_u": ("Active insulin", "U", "number"),
     "cob_g": ("Carbohydrates on board", "g", "number"),
     "battery_percent": ("Phone battery", "%", "number"),
     "sensor_id": ("Sensor identifier", None, "text"),

@@ -331,6 +331,13 @@ async def test_history_websocket_and_card_resource(hass, receiver, snapshot, has
         await logo.read()
         == (Path(__file__).parents[1] / "custom_components/glucifer/brand/icon.png").read_bytes()
     )
+    mark = await client.get("/glucifer/mark.svg")
+    assert mark.status == 200
+    assert mark.content_type == "image/svg+xml"
+    assert (
+        await mark.read()
+        == (Path(__file__).parents[1] / "custom_components/glucifer/brand/mark.svg").read_bytes()
+    )
     # Setup registers the module, making it discoverable without a manual resource.
     await ws.send_json({"id": 3, "type": "lovelace/resources"})
     resources = (await ws.receive_json())["result"]
@@ -636,3 +643,19 @@ async def test_journal_subscription_unload_notifies_client_and_can_unsubscribe(
     assert event["event"] == {"changed": True, "reload": True}
     await ws.send_json({"id": 2, "type": "unsubscribe_events", "subscription": 1})
     assert (await ws.receive_json())["success"]
+
+
+async def test_active_insulin_is_optional_and_cleared(hass, receiver, snapshot):
+    _, client = receiver
+    await send(hass, client, snapshot)
+    assert hass.states.get("sensor.phone_active_insulin") is None
+    snapshot["sequence"] += 1
+    snapshot["fields"]["eiob_u"] = 0.04
+    await send(hass, client, snapshot)
+    state = hass.states.get("sensor.phone_active_insulin")
+    assert float(state.state) == 0.0
+    assert state.attributes["unit_of_measurement"] == "U"
+    snapshot["sequence"] += 1
+    del snapshot["fields"]["eiob_u"]
+    await send(hass, client, snapshot)
+    assert hass.states.get("sensor.phone_active_insulin").state == "unavailable"

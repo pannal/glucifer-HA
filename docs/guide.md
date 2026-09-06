@@ -220,10 +220,12 @@ one does not enable transmission on the phone. Fields that have not been sent or
 are unavailable are omitted. Existing `show_details: false` and
 `show_lifecycle: false` YAML settings remain supported.
 
-The main value stays on the left, with a larger trend arrow on the right.
-Under **Display**, **Arrow size (px)** controls its size from 24 to 160 pixels;
-the default is 96. It scales down on narrow cards to leave room for the value.
-**Show logo**, enabled by default, displays the bundled Glucifer icon at the
+The main value defaults to left alignment, with the trend arrow on the right.
+Under **Display**, **Glucose font size (px)** accepts 24 to 96 pixels (default 42),
+and **Glucose alignment** offers left or center. **Arrow size (px)** accepts
+24 to 160 pixels (default 84). Both scale down on narrow cards. All single
+arrows use the same centered SVG shape, rotated for their direction.
+**Show logo**, enabled by default, displays the transparent Glucifer mark at the
 right of the title. **Show glucose unit**, also enabled by default, controls
 the unit beside the main value.
 Chart and detail units stay visible. Reading age shows seconds from the original
@@ -238,7 +240,8 @@ before display.
 The card reuses HA's native chart component with Glucifer's stored readings.
 Hover to inspect values, hold Ctrl (Command on Mac) while scrolling to zoom,
 drag to pan, and use HA's reset control to restore the full window. Touch
-screens support pinch zoom. Journal markers remain selectable while zoomed.
+screens support pinch zoom. Journal markers remain selectable while zoomed. Click an entry again to close
+its details. Hovering journal markers or chips suppresses the glucose tooltip.
 Colored chips show insulin units, carbohydrate grams, or the note label, with connector lines to their
 points. Nearby chips are staggered; crowded labels are hidden when they cannot
 fit, while their points remain available. Zoom in to see more labels.
@@ -263,6 +266,10 @@ Either color system can be disabled independently.
 For a complete dashboard, copy [examples/dashboard.yaml](../examples/dashboard.yaml)
 into a new dashboard's raw configuration editor and replace its example entity
 IDs. Refresh the browser after updating the integration's card.
+
+### Active insulin (eIOB)
+
+With a compatible NG sender, select **Show effective IOB (eIOB)** in the Glucifer destination to send the optional `eiob_u` field. Enable **Active insulin (eIOB)** in the card editor to display it in parentheses beside IOB. If IOB is hidden, active insulin appears on its own. Missing values stay hidden; zero remains a valid value. Update HA to Glucifer 0.5.0 or later before enabling this sender field.
 
 ### YAML dashboard resources
 

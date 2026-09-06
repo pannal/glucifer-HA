@@ -23,7 +23,7 @@ const {loadNativeChart} = require('./ha-native.cjs');
     });
     await page.waitForFunction(()=>document.querySelector('glucifer-card').chartElement?.chart?.getOption().series?.length===4);
     const root=page.locator('glucifer-card');
-    assert.equal(await root.locator('svg').isVisible(),false);
+    assert.equal(await root.locator('.history-chart').isVisible(),false);
     assert.equal(await root.locator('ha-chart-base canvas').count(),1);
     const data=await page.evaluate(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().series);
     assert.equal(data[0].data.filter(point=>point[1]===null).length,1);
@@ -54,10 +54,26 @@ const {loadNativeChart} = require('./ha-native.cjs');
     assert.match(chip.text,/25 g/);
     await page.mouse.click(chip.x,chip.y);
     assert.equal(await root.locator('.journal-selection').isVisible(),true);
+    // A second click on the same chip closes it; clicking again reopens it.
+    await page.mouse.click(chip.x,chip.y);
+    assert.equal(await root.locator('.journal-selection').isVisible(),false);
+    await page.mouse.click(chip.x,chip.y);
+    assert.equal(await root.locator('.journal-selection').isVisible(),true);
     // Pointer inspection has a localized timestamp and units.
     await page.mouse.move(marker.x-20,marker.y+10);
     await page.clock.runFor(100);
     assert.match(await root.locator('ha-chart-base .chart').textContent(),/mg\/dL/);
+    const visibleTooltips = () => page.evaluate(() => [...document.querySelector('glucifer-card').chartElement.shadowRoot.querySelectorAll('.chart > div')]
+      .filter(el => getComputedStyle(el).position === 'absolute' && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).opacity !== '0').length);
+    assert.equal(await visibleTooltips(),1);
+    for (const point of [marker,chip]) {
+      await page.mouse.move(point.x,point.y);
+      await page.clock.runFor(200);
+      assert.equal(await visibleTooltips(),0, 'Journal hover must hide the glucose tooltip');
+      await page.mouse.move(marker.x-20,marker.y+10);
+      await page.clock.runFor(100);
+      assert.equal(await visibleTooltips(),1, 'Glucose inspection resumes outside journal entries');
+    }
     await page.evaluate(()=>{
       const card=document.querySelector('glucifer-card');window.savedChart=card.chartElement;window.savedClose=card.shadowRoot.querySelector('.journal-selection button');
       window.chartUpdates=0;const update=card.chartElement.chart.setOption.bind(card.chartElement.chart);card.chartElement.chart.setOption=(...args)=>{window.chartUpdates++;return update(...args);};
@@ -72,6 +88,22 @@ const {loadNativeChart} = require('./ha-native.cjs');
     await page.evaluate(()=>{for(let i=0;i<100;i++){window.fixture.states['sensor.other']={state:String(i),attributes:{}};document.querySelector('glucifer-card').hass=window.fixture;}});
     assert.equal(await page.evaluate(()=>window.fetches),calls);
     assert.equal(await page.evaluate(()=>window.chartUpdates),updates);
+    // Apply nested theme variables after the chart is already painted, without a HA state change.
+    await page.evaluate(()=>{
+      document.body.style.setProperty('--late-background','#1c1c1c');
+      document.body.style.setProperty('--late-text','#e1e1e1');
+      document.body.style.setProperty('--ha-card-background','var(--late-background)');
+      document.body.style.setProperty('--primary-text-color','var(--late-text)');
+    });
+    await page.clock.runFor(32);
+    await page.waitForFunction(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().series[2].label.backgroundColor==='rgb(28, 28, 28)');
+    assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().series[2].label.rich.value.color),'rgb(225, 225, 225)');
+    assert.equal(await page.evaluate(()=>window.fetches),calls);
+    assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().dataZoom[0].start),zoom);
+    assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.journal-selection button')===window.savedClose),true);
+    await page.evaluate(()=>document.body.style.setProperty('--late-background','#eef2f6'));
+    await page.clock.runFor(32);
+    await page.waitForFunction(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().series[2].label.backgroundColor==='rgb(238, 242, 246)');
     await page.evaluate(()=>{window.journal=window.journal.map(e=>({...e,amount:30}));document.querySelector('glucifer-card').refresh(true);});
     await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.selection-label').textContent.includes('30 g'));
     assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').chartElement===window.savedChart),true);
@@ -85,6 +117,6 @@ const {loadNativeChart} = require('./ha-native.cjs');
     await root.locator('ha-chart-base .zoom-reset').click();
     await page.waitForFunction(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().dataZoom[0].start===0);
     assert.deepEqual(errors,[]);
-    console.log('Native HA chart checks passed: real canvas marker click, tooltip, gaps, seconds-only updates, stable selection, edits/deletes, zoom preservation and reset.');
+    console.log('Native HA chart checks passed: real canvas chip toggle, journal hover isolation, delayed nested theme colors, tooltip, gaps, seconds-only updates, stable selection, edits/deletes, zoom preservation and reset.');
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});
