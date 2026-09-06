@@ -112,6 +112,11 @@ the file's GitHub URL. Both support quiet hours and a cooldown.
 
 </details>
 
+## Development disclosure
+
+This project is developed with AI assistance, guided by a software developer
+with 24+ years of experience.
+
 ## Reference and license
 
 [Full guide](docs/guide.md) · [Protocol](docs/protocol.md) ·
