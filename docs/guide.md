@@ -69,15 +69,17 @@ Restart Home Assistant after copying the files.
 1. In Home Assistant, open **Settings > Devices & services > Add integration**
    and search for **Glucifer HA**.
 2. Name the phone, for example `My phone`.
-3. Finish setup in Home Assistant. The setup and options screens show its URL and a
-   QR code. If only `/api/webhook/...` is shown, prepend your Home Assistant
+3. Submit the settings to activate the connection, then select **Configure**
+   for the phone. This shows its URL and QR code; scanning does not require
+   another save in HA. If only `/api/webhook/...` is shown, prepend your Home Assistant
    URL and use manual entry.
 4. In the matching JugglucoNG build, open its **API destinations** settings,
    add a **Glucifer HA** destination, and choose **Scan QR Code** or paste the
    complete URL. Confirm the destination host after scanning.
-5. Choose the optional fields and alerts to send. Glucose remains enabled.
-6. Send a test snapshot and check that Home Assistant shows its glucose value
-   and measurement time.
+5. Turn the NG destination on and choose the optional fields and alerts.
+   Glucose remains enabled. Changes are saved automatically.
+6. Send a test snapshot, check Last success and the glucose value in HA,
+   then tap **Done** in NG.
 
 Create a separate integration entry and destination for each phone. A receiver
 binds to the source identifier in its first accepted snapshot. To replace
@@ -229,6 +231,25 @@ includes iCan, Ottai, Anytime CT5, and native Dexcom warmup. Other sensor types
 may report null for warmup while still providing activation and expiry.
 These fields are individually disabled by default and refer to the selected
 glucose source. A receiver still needs a glucose reading to accept a snapshot.
+
+## Update timing and precision
+
+New glucose readings, journal changes, alert changes, and destination edits
+trigger updates. Normal cadence follows the connected glucose source. A
+successful live push restarts the inactivity fallback, which defaults to
+360 seconds. There is no one-second background polling loop.
+
+The minimum interval between requests defaults to one second and applies to
+live snapshots, manual tests, retries, and backfill together for each phone.
+Both this limit and the inactivity fallback offer 1, 5, 10, 30, 60, 120, and
+360 seconds. Changes received while a request is rate-limited are included
+in the next snapshot. A fallback or manual test does not make an old glucose
+reading fresh.
+
+Measurements are rounded to one decimal before sending and in HA, including
+after unit conversion. Timestamps, identifiers, and boolean alerts retain
+their original types. Unchanged rounded measurements do not trigger extra
+sends. Delivery status refreshes while the NG settings screen is visible.
 
 ## QR setup and secret rotation
 

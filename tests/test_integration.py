@@ -122,18 +122,12 @@ async def test_config_flow(hass):
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"name": "Phone"})
     assert result["step_id"] == "receiver"
     assert result["data_schema"]({})["local_only"] is False
-    assert "/api/webhook/" in result["description_placeholders"]["url"]
-    from homeassistant.helpers.selector import QrCodeSelector
-
-    qr = next(
-        value
-        for value in result["data_schema"].schema.values()
-        if isinstance(value, QrCodeSelector)
-    )
-    assert qr.config["data"] == result["description_placeholders"]["url"]
+    # Pairing must not expose a URL before saving activates the webhook.
+    assert not result.get("description_placeholders")
+    assert "qr_code" not in {str(key) for key in result["data_schema"].schema}
     with patch("custom_components.glucifer.async_setup_entry", new=AsyncMock(return_value=True)):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"local_only": True, "stale_seconds": 300, "qr_code": None}
+            result["flow_id"], {"local_only": True, "stale_seconds": 300}
         )
         await hass.async_block_till_done()
     assert result["type"] == "create_entry"
@@ -198,7 +192,7 @@ async def test_units_diagnostics_and_private_export(hass, receiver, snapshot, fr
     await hass.async_block_till_done()
     snapshot["fields"].update(delta_mgdl=18.016, rate_mgdl_min=-1.8016, raw_mgdl=180.16)
     await send(hass, client, snapshot)
-    assert float(hass.states.get("sensor.phone_glucose").state) == pytest.approx(123 / 18.016)
+    assert float(hass.states.get("sensor.phone_glucose").state) == 6.8
     assert float(hass.states.get("sensor.phone_glucose_delta").state) == pytest.approx(1)
     assert float(hass.states.get("sensor.phone_rate_of_change").state) == pytest.approx(-0.1)
     assert hass.states.get("binary_sensor.phone_connected").state == "on"
@@ -353,3 +347,50 @@ async def test_old_storage_format_migrates_without_losing_reading(hass, receiver
     assert entry.runtime_data.data == snapshot
     assert entry.runtime_data.history == [snapshot["glucose"]]
     assert entry.runtime_data.last_contact_ms is None
+
+
+async def test_pairing_qr_accepts_data_without_submitting_options(hass, hass_client, snapshot):
+    from urllib.parse import urlsplit
+
+    from homeassistant.helpers.selector import QrCodeSelector
+
+    assert await async_setup_component(hass, "http", {})
+    assert await async_setup_component(hass, "webhook", {})
+    flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"name": "Phone"})
+    result = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {"local_only": False, "stale_seconds": 300, "glucose_unit": "mg/dL"}
+    )
+    await hass.async_block_till_done()
+    assert result["type"] == "create_entry"
+    options = await hass.config_entries.options.async_init(result["result"].entry_id)
+    qr = next(v for v in options["data_schema"].schema.values() if isinstance(v, QrCodeSelector))
+    assert qr.config["data"] == options["description_placeholders"]["url"]
+    client = await hass_client()
+    response = await client.post(urlsplit(qr.config["data"]).path, json=snapshot)
+    assert response.status == 200
+    assert (await response.json())["status"] == "accepted"
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.phone_glucose").state == "123"
+    hass.config_entries.options.async_abort(options["flow_id"])
+    snapshot["sequence"] += 1
+    response = await client.post(urlsplit(qr.config["data"]).path, json=snapshot)
+    assert (await response.json())["status"] == "accepted"
+
+
+async def test_measurements_round_to_one_decimal(hass, receiver, snapshot):
+    _, client = receiver
+    snapshot["fields"].update(iob_u=1.234567, cob_g=12.367, delta_mgdl=-1.267, rate_mgdl_min=-0.167)
+    await send(hass, client, snapshot)
+    expected = {
+        "insulin_on_board": 1.2,
+        "carbohydrates_on_board": 12.4,
+        "glucose_delta": -1.3,
+        "rate_of_change": -0.2,
+    }
+    for suffix, value in expected.items():
+        assert float(hass.states.get(f"sensor.phone_{suffix}").state) == value
+    snapshot["sequence"] += 1
+    snapshot["fields"]["iob_u"] = 1.234568
+    await send(hass, client, snapshot)
+    assert float(hass.states.get("sensor.phone_insulin_on_board").state) == 1.2

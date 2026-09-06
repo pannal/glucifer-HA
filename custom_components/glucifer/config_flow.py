@@ -70,8 +70,7 @@ class JugglucoFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
         return self.async_show_form(
             step_id="receiver",
-            data_schema=schema(url=endpoint(self.hass, self._webhook_id)),
-            description_placeholders=placeholders(self.hass, self._webhook_id),
+            data_schema=schema(),
         )
 
     @staticmethod

@@ -31,17 +31,21 @@ screen so your phone can scan it. Use the matching JugglucoNG build noted above.
    then turn it on. HACS creates this switch after downloading and restarting;
    you do not need to connect a phone first.
 3. In HA, open **Settings > Devices & services > Add integration > Glucifer HA**.
-   Name the phone, choose your glucose unit, and finish setup.
-4. **Display the QR code:** open the integration options for that phone in HA.
-   Leave the QR code visible on screen.
+   Name the phone, choose your glucose unit, and submit to activate the connection.
+4. **Display the QR code:** select **Configure** for that phone in HA.
+   The connection is already active. Leave the QR code visible; no further
+   save in HA is needed unless you change its settings.
 5. **Scan it in JugglucoNG:** open **API destinations**, add a **Glucifer HA**
    destination, and tap **Scan QR Code**. Scan the code, confirm the Home
-   Assistant host, then enable and save the destination.
+   Assistant host, then turn the destination on. NG saves changes automatically.
 6. Choose what to send. Glucose and measurement time are always enabled;
    trend, delta, and alerts start enabled. Other fields and history backfill
-   start disabled.
+   start disabled. New glucose readings and saved changes trigger updates.
+   The minimum send interval defaults to **1 second**; an inactivity fallback
+   refreshes after **360 seconds** without a successful live push. Both offer
+   1, 5, 10, 30, 60, 120, or 360 seconds.
 7. Tap **Send test message** in JugglucoNG. Check that HA shows the glucose
-   value and measurement time.
+   value and measurement time, then tap **Done** in NG.
 
 The phone must be able to reach Home Assistant. **Accept local requests only**
 starts off for new connections. If you cannot scan the code,

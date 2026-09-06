@@ -52,12 +52,12 @@ class GluciferCard extends HTMLElement {
     const unit = glucose?.attributes.unit_of_measurement || this.data?.unit || "mg/dL";
     const value = valid ? Number(glucose.state) : NaN;
     text("h2", this.config.title || "Glucifer HA");
-    text(".glucose", Number.isFinite(value) ? `${value.toFixed(unit === "mmol/L" ? 1 : 0)} ${unit}` : "Unavailable");
+    text(".glucose", Number.isFinite(value) ? `${value.toFixed(1)} ${unit}` : "Unavailable");
     const age = state("reading_age")?.state;
     const trend = state("trend")?.state;
     const delta = state("delta_mgdl");
     text(".summary", [trend && !["unknown", "unavailable"].includes(trend) ? trend : null,
-      delta && Number.isFinite(Number(delta.state)) ? `Δ ${Number(delta.state).toFixed(unit === "mmol/L" ? 1 : 0)} ${delta.attributes.unit_of_measurement}` : null,
+      delta && Number.isFinite(Number(delta.state)) ? `Δ ${Number(delta.state).toFixed(1)} ${delta.attributes.unit_of_measurement}` : null,
       age && Number.isFinite(Number(age)) ? `Reading ${Math.floor(Number(age) / 60)} min old` : null].filter(Boolean).join(" · "));
     text(".health", state("connected")?.state === "off" ? "Phone has not contacted Home Assistant recently" : state("stale")?.state === "on" ? "Glucose reading is stale" : "");
     const until = Date.now();
