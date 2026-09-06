@@ -7,9 +7,10 @@ Home Assistant through a private webhook. Includes mg/dL and mmol/L,
 boolean alert sensors, connection diagnostics, a dashboard card, and optional
 history backfill. No separate server or MQTT broker required.
 
-**Alpha:** requires Home Assistant **2026.9.1+** and a JugglucoNG build with the
-**Glucifer HA** outbound API preset. That sender is not in an upstream release
-yet. Live phone-to-Home-Assistant testing is still pending.
+**Requirements:** Home Assistant **2026.9.1+** and a JugglucoNG build with the
+**Glucifer HA** outbound API preset. The sender contribution is available in
+[JugglucoNG PR #275](https://github.com/ctqvva/JugglucoNG/pull/275); it is not
+in an upstream release yet.
 
 > [!CAUTION]
 > **Not a medical device.** Do not use readings, alerts, or automations for
@@ -25,29 +26,25 @@ JugglucoNG build noted above.
 
 1. In **HACS > Custom repositories**, add
    `https://github.com/pannal/glucifer-ha` as an **Integration**. Open its
-   download dialog, expand **Need a different version?**, select the latest
-   alpha release, download it, and restart Home Assistant.
-2. **Enable alpha updates:** open **Settings > Devices & services > HACS >
-   Devices > Glucifer HA**. Show disabled entities, enable **Pre-release**,
-   then turn it on. HACS creates this switch after downloading and restarting;
-   you do not need to connect a phone first.
-3. In HA, open **Settings > Devices & services > Add integration > Glucifer HA**.
+   download dialog, select the latest stable release, download it, and restart
+   Home Assistant. Pre-release tracking is not required.
+2. In HA, open **Settings > Devices & services > Add integration > Glucifer HA**.
    Name the phone, choose your glucose unit, and select **Submit**.
-4. **Pair the phone:** HA continues directly to the QR code and connection URL.
+3. **Pair the phone:** HA continues directly to the QR code and connection URL.
    The connection is already active. You can reopen these details later through
    **Configure** for that phone; no further submit is needed unless you change settings.
-5. In JugglucoNG, open **API destinations** and add a **Glucifer HA** destination.
+4. In JugglucoNG, open **API destinations** and add a **Glucifer HA** destination.
    **Manual:** copy the connection URL from HA and paste it into **POST URL**.
    **QR:** tap **Scan QR Code**, scan from another screen, and confirm the HA host.
    Turn the destination on. NG saves changes automatically.
-6. Choose what to send. Glucose and measurement time are always enabled;
+5. Choose what to send. Glucose and measurement time are always enabled;
    trend, delta, and alerts start enabled. Other fields and history backfill
    start disabled. **Live events bypass the background interval** starts on:
    glucose, journal, and alert changes send promptly, with a one-second minimum.
    Background sends default to one-second spacing; inactivity checks default
    to **1 hour**. Both controls offer intervals up to **24 hours**. Unchanged,
    acknowledged data is skipped. HA's **Backfill active** sensor shows transfers.
-7. Tap **Send test message** in JugglucoNG. Check that HA shows the glucose
+6. Tap **Send test message** in JugglucoNG. Check that HA shows the glucose
    value and measurement time, then tap **Done** in NG.
 
 The phone must be able to reach Home Assistant. **Accept local requests only**
@@ -111,10 +108,14 @@ the file's GitHub URL. Both support quiet hours and a cooldown.
 <details>
 <summary><strong>Installation help, remote access, and troubleshooting</strong></summary>
 
-- HACS offers a commit hash as an update? Enable **Pre-release** on the
-  HACS-managed Glucifer HA device as described in Quick setup, then select
-  **Update information** in the HACS repository menu. Installing an alpha
-  manually does not enable prerelease tracking.
+- Upgrading from an alpha? Select **Update information** in the HACS
+  repository menu, then install **v0.2.0** or newer. You can turn off the
+  HACS-managed **Pre-release** switch to follow stable releases.
+- Want preview releases? Open **Settings > Devices & services > HACS >
+  Devices > Glucifer HA**, show disabled entities, enable **Pre-release**,
+  and turn it on. HACS creates this switch after downloading and restarting;
+  connecting a phone first is not required. Installing an alpha manually
+  does not enable prerelease tracking.
 - Installing manually? Copy `custom_components/glucifer` into your HA
   configuration directory and restart HA.
 - Works only on Wi-Fi? Use a reachable HTTPS endpoint or VPN and check

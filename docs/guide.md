@@ -38,11 +38,12 @@ container, add-on, or listening port.
 
 1. Open HACS, then its menu and **Custom repositories**.
 2. Add `https://github.com/pannal/glucifer-ha` with type **Integration**.
-3. Enable pre-release versions in HACS if selecting an alpha release, download
-   **Glucifer HA**, and restart Home Assistant.
+3. Download the latest stable release of **Glucifer HA** and restart Home
+   Assistant. Pre-release tracking is not required.
 
-If the alpha is missing from HACS, enable the repository's pre-release switch
-entity in Home Assistant, turn it on, and refresh the repository information.
+To try preview releases, enable the repository's pre-release switch entity
+in Home Assistant, turn it on, and refresh the repository information. Turn
+it off to follow stable releases.
 HACS documents this under [switch entities](https://www.hacs.dev/docs/use/entities/switch/).
 
 The project has not been submitted to the HACS default catalog. A custom
