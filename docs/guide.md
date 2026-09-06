@@ -223,7 +223,15 @@ are unavailable are omitted. Existing `show_details: false` and
 The main value defaults to left alignment, with the trend arrow on the right.
 Under **Display**, **Glucose font size (px)** accepts 24 to 96 pixels (default 42),
 and **Glucose alignment** offers left or centered across the whole card. **Arrow size (px)** accepts
-24 to 160 pixels (default 84). Both scale down on narrow cards. All single
+24 to 160 pixels (default 84). **Arrow length (px)** accepts 24 to 240 pixels
+along the arrow direction; **Arrow stroke width (px)** accepts 1 to 16 pixels.
+Leave either empty to scale it with arrow size. Numeric settings have sliders
+and entry fields. The selected glucose font size applies whenever it fits;
+text and arrows shrink when needed on narrow cards.
+**Glucose font weight** and **Glucose font style** control weight and italics.
+**Glucose font family** accepts a browser font such as `Arial`, `Georgia` or
+`monospace`, including CSS fallback lists. Leave it empty for the dashboard font.
+No fonts are downloaded, so availability depends on the device. All single
 arrows use the same centered SVG shape, rotated for their direction.
 **Arrow position** keeps the arrow at the right edge, either beside glucose
 (the default) or lower beside the delta and IOB lines.
@@ -237,7 +245,11 @@ until closed, removed, or hidden by a filter.
 
 Sensor and journal dates use your HA profile's language, date order, 12/24-hour
 format, and browser/server time-zone preference. UTC timestamps are converted
-before display.
+before display. **Locale** can override number and date formatting for this
+card, for example `de-DE`, `en-GB` or `fr-FR`. Leave it empty to follow HA's
+preferences. The override does not change units, time zone or interface labels.
+Display edits keep the loaded history, subscription, zoom and journal selection;
+a change of glucose entity clears the old receiver's data.
 
 The card reuses HA's native chart component with Glucifer's stored readings.
 Hover to inspect values, hold Ctrl (Command on Mac) while scrolling to zoom,

@@ -42,6 +42,7 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
       {dark:true, name:'dashboard-mmol-interactive', config:{}},
       {dark:true, name:'dashboard-centered-active-insulin', config:{glucose_size:64,glucose_alignment:'center',show_glucose_unit:false,show_eiob_u:true}},
       {dark:true, name:'dashboard-lower-arrow', config:{glucose_size:64,glucose_alignment:'center',show_glucose_unit:false,show_eiob_u:true,arrow_position:'details'}},
+      {dark:true, name:'dashboard-typography-locale', config:{glucose_size:96,glucose_alignment:'center',show_glucose_unit:false,arrow_position:'details',arrow_length:140,arrow_width:4,glucose_font:'Georgia',glucose_weight:400,glucose_style:'italic',locale:'de-DE',show_eiob_u:true}},
       {dark:false, name:'dashboard-expanded-journal', config:{glucose_size:48,arrow_size:64,journal_compact:false,show_logo:false,show_journal_symbols:true}},
     ]) {
       await page.evaluate(({dark,config}) => {
@@ -96,7 +97,7 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
       });
     }
     if (errors.length) throw new Error(errors.join('\n'));
-    console.log('Captured five dashboard previews from the bundled card using synthetic data.');
+    console.log('Captured six dashboard previews from the bundled card using synthetic data.');
   } finally {
     await browser.close();
   }

@@ -82,6 +82,7 @@ const path = require('node:path');
     const card=document.querySelector('glucifer-card');
     card.hass=window.fixture;
     card.setConfig({entity:'sensor.phone_glucose',hours:6,show_journal:true,journal_limit:2,journal_days:1});
+    window.notifyJournal({}); // Publish the newly added history through the live subscription.
   });
   await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelectorAll('.journal-marker').length===3);
   assert.equal(await root.locator('.journal-list button').count(),2);
@@ -347,6 +348,49 @@ const path = require('node:path');
   assert.doesNotMatch(await root.locator('.optional-values').textContent(),/Active:/);
   await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_eiob_u=true;window.fixture.states['sensor.eiob'].state='unavailable';card.render();});
   assert.doesNotMatch(await root.locator('.optional-values').textContent(),/Active:/);
+  // Font size is honored on a normal card, with independently styled local text.
+  await page.setViewportSize({width:528,height:1000});
+  await page.evaluate(()=>{
+    const card=document.querySelector('glucifer-card');
+    window.fixture.states['sensor.phone_glucose']={state:'135',attributes:{unit_of_measurement:'mg/dL'}};
+    window.fixture.states['sensor.phone_trend'].state='Flat';
+    card.setConfig({...card.config,glucose_size:96,glucose_alignment:'center',show_glucose_unit:false,arrow_position:'details',glucose_style:'italic',glucose_weight:700,glucose_font:'Georgia'});
+  });
+  const font=await root.locator('.glucose').evaluate(el=>{const s=getComputedStyle(el);return [s.fontSize,s.fontStyle,s.fontWeight,s.fontFamily];});
+  assert.deepEqual(font,['96px','italic','700','Georgia']);
+  // Locale affects all rendered numbers and dates, without changing units/time zone.
+  await page.evaluate(()=>{
+    const card=document.querySelector('glucifer-card');
+    window.fixture.states['sensor.phone_glucose']={state:'7.5',attributes:{unit_of_measurement:'mmol/L'}};
+    window.fixture.states['sensor.phone_delta'].state='1.2';
+    card.setConfig({...card.config,locale:'de-DE',show_glucose_unit:true,show_delta_mgdl:true});
+  });
+  assert.equal(await root.locator('.glucose').textContent(),'7,5 mmol/L');
+  assert.match(await root.locator('.delta').textContent(),/1,2/);
+  assert.match(await root.locator('.optional-values').textContent(),/1,2 U/);
+  assert.match(await page.evaluate(()=>document.querySelector('glucifer-card').formatDateTime('2026-09-06T12:00:00Z')),/6\.9\.2026, 12:00/);
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.setConfig({...card.config,locale:'en-US'});});
+  assert.equal(await root.locator('.glucose').textContent(),'7.5 mmol/L');
+  assert.match(await page.evaluate(()=>document.querySelector('glucifer-card').formatDateTime('2026-09-06T12:00:00Z')),/9\/6\/2026, 12:00 PM/);
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');window.fixture.locale.number_format='decimal_comma';card.setConfig({...card.config,locale:''});});
+  assert.equal(await root.locator('.glucose').textContent(),'7,5 mmol/L');
+  assert.equal(await page.evaluate(()=>{try{customElements.get('glucifer-card').getConfigForm().assertConfig({locale:'not_a_locale'});return false;}catch{return true;}}),true);
+  // Independent length and stroke width keep consistent arrow geometry in every direction.
+  await page.setViewportSize({width:800,height:1000});
+  for(const trend of ['Flat','FortyFiveUp','SingleUp','DoubleDown']) {
+    await page.evaluate(trend=>{const card=document.querySelector('glucifer-card');window.fixture.states['sensor.phone_trend'].state=trend;card.setConfig({...card.config,arrow_size:84,arrow_length:140,arrow_width:8});},trend);
+    const before=await root.locator('.trend').boundingBox();
+    assert.ok(Math.max(before.width,before.height)>110);
+    const thickness=await root.locator('.trend path').evaluate(el=>parseFloat(getComputedStyle(el).strokeWidth)*el.getScreenCTM().a);
+    if(trend==='Flat') assert.ok(Math.abs(thickness-8)<.01);
+    for(const width of [528,280]) {
+      await page.setViewportSize({width,height:1100});
+      await page.evaluate(()=>document.querySelector('glucifer-card').render());
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      const bounds=await root.locator('.trend').boundingBox(); assert.ok(bounds.x>=0 && bounds.x+bounds.width<=width);
+    }
+    await page.setViewportSize({width:800,height:1000});
+  }
   // An entity change during an outstanding request must fetch the new entity.
   await page.evaluate(()=>{
     const card=document.querySelector('glucifer-card');

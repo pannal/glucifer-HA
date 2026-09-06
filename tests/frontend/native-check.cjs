@@ -157,7 +157,8 @@ const {loadNativeChart} = require('./ha-native.cjs');
     assert.match(await root.locator('.journal-selection').textContent(),/20 g/);
     await page.mouse.click(pill.x,pill.y);
     assert.equal(await root.locator('.journal-selection').isVisible(),false);
+    await require('./editor-check.cjs').checkNativeEditor(page);
     assert.deepEqual(errors,[]);
-    console.log('Native HA chart checks passed: real canvas chip toggle, journal hover isolation, delayed nested theme colors, tooltip, gaps, seconds-only updates, stable selection, edits/deletes, zoom preservation and reset.');
+    console.log('Native HA chart checks passed: real canvas chip toggle, journal hover isolation, delayed nested theme colors, tooltip, gaps, seconds-only updates, stable selection, edits/deletes, zoom preservation, native editor defaults, slider drag/keyboard input, font/locale controls and retained preview data.');
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

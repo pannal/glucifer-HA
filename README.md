@@ -1,6 +1,6 @@
 # Glucifer for Home Assistant
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png?v=0.5.1" alt="Glucifer HA: horned glucose drop and insulin pen beside the Home Assistant icon and Glucifer HA lettering" width="100%">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png?v=0.5.2" alt="Glucifer HA: horned glucose drop and insulin pen beside the Home Assistant icon and Glucifer HA lettering" width="100%">
 
 Bring [JugglucoNG](https://github.com/ctqvva/JugglucoNG) glucose readings into
 Home Assistant through a private webhook. Includes mg/dL and mmol/L,
@@ -63,19 +63,24 @@ and dark themes. These are card previews, not captures from a live HA installati
 
 | mg/dL with journal markers and history | mmol/L with journal markers and history |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png?v=0.5.1" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png?v=0.5.1" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png?v=0.5.2" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png?v=0.5.2" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
 
 <details>
 <summary><strong>More card layouts</strong></summary>
 
 | Centered value, hidden unit and active insulin | Expanded journal, optional markers and hidden logo |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-centered-active-insulin.png?v=0.5.1" alt="Dark card with a centered 6.8 glucose value and Insulin on board: 5.2 U (Active: 1.7 U)" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-expanded-journal.png?v=0.5.1" alt="Light card with a larger 123 mg/dL value, optional chart markers and padded journal rows" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-centered-active-insulin.png?v=0.5.2" alt="Dark card with a centered 6.8 glucose value and Insulin on board: 5.2 U (Active: 1.7 U)" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-expanded-journal.png?v=0.5.2" alt="Light card with a larger 123 mg/dL value, optional chart markers and padded journal rows" width="400"> |
 
 **Arrow position: lower, beside delta and IOB** keeps the arrow on the right
 while giving the glucose value its own row.
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-lower-arrow.png?v=0.5.1" alt="Centered glucose above the delta and active insulin details, with the trend arrow at the right of the details" width="400">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-lower-arrow.png?v=0.5.2" alt="Centered glucose above the delta and active insulin details, with the trend arrow at the right of the details" width="400">
+
+**Typography and locale**: an italic Georgia value, a longer, thinner arrow,
+and German number/date formatting. Fonts come from the browser.
+
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-typography-locale.png?v=0.5.2" alt="Dark card showing a large italic 6,8 glucose value, a longer thin arrow beside details, and German number formatting" width="400">
 
 These options are available in the card's visual editor.
 
@@ -103,7 +108,14 @@ the trend arrow sits on the right. **Arrow size** defaults to 84 px; all
 single arrows use the same SVG shape. **Arrow position** keeps it beside glucose
 or moves it lower beside the delta/IOB lines. **Glucose font size** defaults to 42 px.
 **Glucose alignment** can be left or centered across the whole card. **Show glucose unit** controls
-the unit beside the main value. Large sizes scale down on narrow cards.
+the unit beside the main value. Large sizes scale down only when needed to fit.
+
+Numeric settings have sliders and precise entry fields. **Arrow length** and
+**Arrow stroke width** can be set independently, or left empty to follow arrow
+size. The glucose value has font weight, normal/italic style, and local font
+family controls. **Locale** accepts values such as `de-DE` or `en-GB`; leave it
+empty to follow HA's number and date preferences. Units and time zone stay as
+configured in HA. Editing these options keeps loaded data and chart zoom.
 
 For eIOB, enable **Show effective IOB (eIOB)** in NG's Glucifer destination
 and **Active insulin (eIOB)** in the card editor. With IOB visible, the card

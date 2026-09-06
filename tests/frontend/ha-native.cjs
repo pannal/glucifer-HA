@@ -47,4 +47,37 @@ async function loadNativeChart(page) {
     });
   }, {chunks, shared});
 }
-module.exports = {loadNativeChart};
+async function loadNativeEditor(page) {
+  // Resolve static dependencies from the shipped module definitions. No editor or
+  // selector implementation is replaced; lazy selectors load through HA's runtime.
+  const latest = path.join(process.env.GLUCIFER_HA_FRONTEND, 'frontend_latest');
+  const modules = new Map();
+  for (const file of fs.readdirSync(latest).filter(file => /^\d+\..*\.js$/.test(file))) {
+    const source = fs.readFileSync(path.join(latest,file),'utf8');
+    const matches = [...source.matchAll(/(?:[{},])(\d+)\((\w+),(\w+),(\w+)\)\{/g)];
+    for (let index=0; index<matches.length; index++) {
+      const match=matches[index], body=source.slice(match.index, matches[index+1]?.index);
+      if (!modules.has(match[1]) || modules.get(match[1]).body.length < body.length)
+        modules.set(match[1],{file,body,require:match[4]});
+    }
+  }
+  const available = new Set(await page.evaluate(() => Object.keys(window.haTestRequire.m)));
+  const needed = new Map();
+  const visit = id => {
+    if (available.has(id) || needed.has(id)) return;
+    const module=modules.get(id);
+    if (!module) throw new Error(`Missing native editor module ${id}`);
+    needed.set(id,module.file);
+    for (const match of module.body.matchAll(new RegExp(`\\b${module.require}\\((\\d+)\\)`, 'g'))) visit(match[1]);
+  };
+  visit('53410');
+  await page.evaluate(async entries => {
+    const require=window.haTestRequire;
+    for (const [id,file] of entries) {
+      const module=await import(`/frontend_latest/${file}`);
+      if (!require.m[id]) require.m[id]=module.__webpack_modules__[id];
+    }
+    await require(53410);
+  }, [...needed]);
+}
+module.exports = {loadNativeChart, loadNativeEditor};
