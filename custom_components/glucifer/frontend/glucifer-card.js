@@ -33,12 +33,13 @@ class GluciferCard extends HTMLElement {
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     // All dynamic labels and states are assigned through textContent.
     this.shadowRoot.innerHTML = `<style>
-      ha-card {padding:20px} h2 {margin:0 0 12px;font-size:20px} .glucose {font-size:42px;font-weight:600}
+      ha-card {padding:20px} h2 {margin:0 0 12px;font-size:20px} .reading {display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+      .glucose,.trend {font-size:42px;font-weight:600} .trend {white-space:nowrap}
       .detail {color:var(--secondary-text-color);margin:8px 0} .warning {color:var(--warning-color)}
       svg {width:100%;height:180px;overflow:visible} path {fill:none;stroke:var(--primary-color);stroke-width:2}
       .axis {display:flex;justify-content:space-between;font-size:12px;color:var(--secondary-text-color)}
       ul {padding-left:20px} button {margin-top:12px;border:0;background:none;color:var(--primary-color);cursor:pointer}
-    </style><ha-card><h2></h2><div class="glucose"></div><div class="detail summary"></div>
+    </style><ha-card><h2></h2><div class="reading"><div class="glucose"></div><span class="trend"></span></div><div class="detail summary"></div>
       <div class="warning health"></div><svg viewBox="0 0 600 180" role="img" aria-label="Glucose history"><path></path></svg>
       <div class="axis"><span class="start"></span><span class="range"></span><span class="end"></span></div>
       <div class="detail history"></div><ul></ul><div class="detail lifecycle"></div><button>More details</button></ha-card>`;
@@ -56,8 +57,13 @@ class GluciferCard extends HTMLElement {
     text(".glucose", Number.isFinite(value) ? `${value.toFixed(glucosePrecision)} ${unit}` : "Unavailable");
     const age = state("reading_age")?.state;
     const trend = state("trend")?.state;
+    const trendArrow = new Map([
+      ["DoubleUp", "↑↑"], ["SingleUp", "↑"], ["FortyFiveUp", "↗"],
+      ["Flat", "→"], ["FortyFiveDown", "↘"], ["SingleDown", "↓"], ["DoubleDown", "↓↓"],
+    ]).get(trend);
+    text(".trend", Number.isFinite(value) ? trendArrow || "" : "");
     const delta = state("delta_mgdl");
-    text(".summary", [trend && !["unknown", "unavailable"].includes(trend) ? trend : null,
+    text(".summary", [
       delta && Number.isFinite(Number(delta.state)) ? `Δ ${Number(delta.state).toFixed(1)} ${delta.attributes.unit_of_measurement}` : null,
       age && Number.isFinite(Number(age)) ? `Reading ${Math.floor(Number(age) / 60)} min old` : null].filter(Boolean).join(" · "));
     text(".health", state("connected")?.state === "off" ? "Phone has not contacted Home Assistant recently" : state("stale")?.state === "on" ? "Glucose reading is stale" : "");
