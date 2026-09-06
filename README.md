@@ -23,19 +23,24 @@ Pair with a QR code from Home Assistant. Have HA open on a computer or another
 screen so your phone can scan it. Use the matching JugglucoNG build noted above.
 
 1. In **HACS > Custom repositories**, add
-   `https://github.com/pannal/glucifer-ha` as an **Integration**. Enable
-   pre-release versions, download Glucifer HA, and restart Home Assistant.
-2. In HA, open **Settings > Devices & services > Add integration > Glucifer HA**.
+   `https://github.com/pannal/glucifer-ha` as an **Integration**. Open its
+   download dialog, expand **Need a different version?**, select the latest
+   alpha release, download it, and restart Home Assistant.
+2. **Enable alpha updates:** open **Settings > Devices & services > HACS >
+   Devices > Glucifer HA**. Show disabled entities, enable **Pre-release**,
+   then turn it on. HACS creates this switch after downloading and restarting;
+   you do not need to connect a phone first.
+3. In HA, open **Settings > Devices & services > Add integration > Glucifer HA**.
    Name the phone, choose your glucose unit, and finish setup.
-3. **Display the QR code:** open the integration options for that phone in HA.
+4. **Display the QR code:** open the integration options for that phone in HA.
    Leave the QR code visible on screen.
-4. **Scan it in JugglucoNG:** open **API destinations**, add a **Glucifer HA**
+5. **Scan it in JugglucoNG:** open **API destinations**, add a **Glucifer HA**
    destination, and tap **Scan QR Code**. Scan the code, confirm the Home
    Assistant host, then enable and save the destination.
-5. Choose what to send. Glucose and measurement time are always enabled;
+6. Choose what to send. Glucose and measurement time are always enabled;
    trend, delta, and alerts start enabled. Other fields and history backfill
    start disabled.
-6. Tap **Send test message** in JugglucoNG. Check that HA shows the glucose
+7. Tap **Send test message** in JugglucoNG. Check that HA shows the glucose
    value and measurement time.
 
 The phone must be able to reach Home Assistant. **Accept local requests only**
@@ -100,8 +105,10 @@ the file's GitHub URL. Both support quiet hours and a cooldown.
 <details>
 <summary><strong>Installation help, remote access, and troubleshooting</strong></summary>
 
-- Alpha missing in HACS? Enable the repository's pre-release switch entity,
-  turn it on, and refresh repository information.
+- HACS offers a commit hash as an update? Enable **Pre-release** on the
+  HACS-managed Glucifer HA device as described in Quick setup, then select
+  **Update information** in the HACS repository menu. Installing an alpha
+  manually does not enable prerelease tracking.
 - Installing manually? Copy `custom_components/glucifer` into your HA
   configuration directory and restart HA.
 - Works only on Wi-Fi? Use a reachable HTTPS endpoint or VPN and check
