@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import DEFAULT_STALE_SECONDS, DOMAIN, HISTORY_DAYS, MAX_HISTORY_POINTS
+from .journal import apply_journal, empty_journal, restore_journal, validate_journal
 from .protocol import (
     InvalidSnapshot,
     classify_snapshot,
@@ -33,6 +34,8 @@ class JugglucoCoordinator(DataUpdateCoordinator):
         self.lock = asyncio.Lock()
         self.data = None
         self.history = []
+        self.journal = empty_journal()
+        self.revision = 0
         self.last_contact_ms = None
         self.backfill_active = None
         # Capture the registered secret; entry.data may change before unload.
@@ -65,10 +68,19 @@ class JugglucoCoordinator(DataUpdateCoordinator):
                     )
                     validated.extend(batch["readings"])
                 self.history = self.merge_history(validated, [self.data["glucose"]])
+                try:
+                    self.journal = restore_journal(saved.get("journal"), self.now_ms)
+                    receipt = self.journal["last_payload"]
+                    if receipt is not None and receipt["source_id"] != self.data["source_id"]:
+                        raise InvalidSnapshot("source_mismatch")
+                except InvalidSnapshot, TypeError, KeyError:
+                    LOGGER.warning("Ignoring invalid saved Glucifer journal")
+                    self.journal = empty_journal()
             except InvalidSnapshot, TypeError, KeyError:
                 LOGGER.warning("Ignoring invalid saved Glucifer data")
                 self.data = None
                 self.history = []
+                self.journal = empty_journal()
                 self.last_contact_ms = None
         self.entry.async_on_unload(
             async_track_time_interval(self.hass, self._tick, timedelta(seconds=15))
@@ -106,10 +118,11 @@ class JugglucoCoordinator(DataUpdateCoordinator):
                 points.setdefault(point["time_ms"], point)
         return [points[key] for key in sorted(points)[-MAX_HISTORY_POINTS:]]
 
-    async def _save(self, snapshot, history, contact, backfill_active=None):
+    async def _save(self, snapshot, history, contact, backfill_active=None, journal=None):
         await self.store.async_save(
             {
                 "snapshot": snapshot,
+                "journal": self.journal if journal is None else journal,
                 "history": history,
                 "last_contact_ms": contact,
                 "backfill_active": self.backfill_active
@@ -119,6 +132,8 @@ class JugglucoCoordinator(DataUpdateCoordinator):
         )
 
     async def async_accept(self, payload):
+        if isinstance(payload, dict) and payload.get("type") == "journal":
+            return await self.async_accept_journal(payload)
         if isinstance(payload, dict) and payload.get("type") == "backfill_status":
             return await self.async_accept_backfill_status(payload)
         if isinstance(payload, dict) and payload.get("type") == "history":
@@ -135,6 +150,8 @@ class JugglucoCoordinator(DataUpdateCoordinator):
             contact = self.now_ms
             await self._save(snapshot, history, contact)
             self.history, self.last_contact_ms = history, contact
+            if status == "accepted":
+                self.revision += 1
             self.async_set_updated_data(snapshot)
             return {
                 "schema_version": incoming["schema_version"],
@@ -142,7 +159,7 @@ class JugglucoCoordinator(DataUpdateCoordinator):
                 "sequence": incoming["sequence"],
                 "status": status,
                 "supported_versions": [1, 2],
-                "capabilities": ["backfill_status"],
+                "capabilities": ["backfill_status", "journal_v1"],
                 "history_days": HISTORY_DAYS,
             }
 
@@ -156,6 +173,8 @@ class JugglucoCoordinator(DataUpdateCoordinator):
             history = self.merge_history(self.history, incoming["readings"])
             contact = self.now_ms
             await self._save(self.data, history, contact)
+            if history != self.history:
+                self.revision += 1
             self.history, self.last_contact_ms = history, contact
             self.async_update_listeners()
             return {
@@ -178,3 +197,23 @@ class JugglucoCoordinator(DataUpdateCoordinator):
             self.last_contact_ms = contact
             self.async_update_listeners()
             return {**incoming, "status": "accepted"}
+
+    async def async_accept_journal(self, payload):
+        incoming = validate_journal(payload, self.now_ms)
+        async with self.lock:
+            if self.data is None or incoming["source_id"] != self.data["source_id"]:
+                raise InvalidSnapshot("source_mismatch")
+            journal, status = apply_journal(self.journal, incoming, self.now_ms)
+            contact = self.now_ms
+            await self._save(self.data, self.history, contact, journal=journal)
+            self.journal, self.last_contact_ms = journal, contact
+            if status == "accepted":
+                self.revision += 1
+            self.async_update_listeners()
+            return {
+                "schema_version": 2,
+                "type": "journal",
+                "source_id": incoming["source_id"],
+                "sequence": incoming["sequence"],
+                "status": status,
+            }

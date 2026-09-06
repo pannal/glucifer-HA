@@ -5,7 +5,7 @@
 Bring [JugglucoNG](https://github.com/ctqvva/JugglucoNG) glucose readings into
 Home Assistant through a private webhook. Includes mg/dL and mmol/L,
 boolean alert sensors, connection diagnostics, a dashboard card, and optional
-history backfill. No separate server or MQTT broker required.
+history backfill and live journal sync. No separate server or MQTT broker required.
 
 **Requirements:** Home Assistant **2026.9.1+** and a JugglucoNG build with the
 **Glucifer HA** outbound API preset. The sender contribution is available in
@@ -44,6 +44,8 @@ JugglucoNG build noted above.
    Background sends default to one-second spacing; inactivity checks default
    to **1 hour**. Both controls offer intervals up to **24 hours**. Unchanged,
    acknowledged data is skipped. HA's **Backfill active** sensor shows transfers.
+   For journal entries, enable **Sync journal entries**: insulin and carbs are included,
+   notes are opt-in, and history defaults to **7 days**.
 6. Tap **Send test message** in JugglucoNG. Check that HA shows the glucose
    value and measurement time, then tap **Done** in NG.
 
@@ -57,9 +59,9 @@ Keep the connection URL and QR code private: they contain a secret.
 Browser captures of the bundled card with **synthetic data**, shown in light
 and dark themes. These are card previews, not captures from a live HA installation.
 
-| mg/dL with history | mmol/L with stale data |
+| mg/dL with journal markers and history | mmol/L with stale data and journal |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl.png" alt="Glucifer card displaying 123 mg/dL and a six-hour history chart" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-stale.png" alt="Glucifer card displaying unavailable glucose, a stale-data warning, and history in mmol/L" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/v0.3.0/docs/screenshots/dashboard-mgdl.png" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/v0.3.0/docs/screenshots/dashboard-mmol-stale.png" alt="Glucifer card in dark mode with unavailable glucose, a stale-data warning, journal markers, and history in mmol/L" width="400"> |
 
 ## Setup details
 
@@ -68,14 +70,11 @@ and dark themes. These are card previews, not captures from a live HA installati
 
 Enable advanced mode in your Home Assistant profile, then open
 **Settings > Dashboards > Resources**. Add `/glucifer/glucifer-card.js` as a
-**JavaScript module**. Add a manual card and replace the example entity ID:
-
-```yaml
-type: custom:glucifer-card
-entity: sensor.phone_glucose
-title: Glucose
-hours: 24
-```
+**JavaScript module**. Refresh the browser, edit your dashboard, and choose
+**Add card > Glucifer HA**. Select your phone's glucose entity in the visual
+editor. Its expandable sections control chart length, journal display,
+visible details, glucose ranges, and separate colors for the value and arrow.
+No YAML is needed. Existing manual cards keep working.
 
 The card finds the receiver's other entities automatically. Enable history
 backfill in JugglucoNG to recover up to seven days of retained readings.
@@ -83,6 +82,26 @@ Imported readings appear in this card; they do not rewrite HA Recorder history.
 
 [Full dashboard example](examples/dashboard.yaml) ·
 [Dashboard and history details](docs/guide.md#dashboard)
+
+</details>
+
+<details>
+<summary><strong>Live journal entries</strong></summary>
+
+Enable **Sync journal entries** in the phone's Glucifer destination. Insulin and
+carbohydrate entries sync when created, edited, or deleted, without waiting
+for a glucose reading. **Include notes and note entries** is a separate opt-in.
+Choose how much history to send, from 1 to 90 days; the default is 7 days.
+
+The card shows **▲ insulin**, **● carbohydrates**, and **■ notes** on the
+chart. Select a point for its details. In the visual editor's **Journal**
+section, enable the optional history list, choose entry types and days,
+and set its maximum length (25 entries by default).
+
+Turning off journal sync clears the copy in HA after the phone's next
+successful journal request. Hiding the list only changes the card's display.
+
+[Journal settings and limits](docs/guide.md#journal)
 
 </details>
 
@@ -121,6 +140,8 @@ the file's GitHub URL. Both support quiet hours and a cooldown.
 - Works only on Wi-Fi? Use a reachable HTTPS endpoint or VPN and check
   **Accept local requests only** in the integration options.
 - No updates? Verify the full receiver URL and send a test snapshot.
+- Card still looks old? Restart HA after updating, refresh the browser, and
+  change its resource URL to `/glucifer/glucifer-card.js?v=0.3.0` if needed.
 - Optional entity missing? Enable its field and wait for an accepted snapshot.
 - Replacing a secret? Select **Replace the connection URL** in the options,
   complete the flow, then update the phone's destination with the new QR code.

@@ -9,7 +9,7 @@ const path = require('node:path');
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({
-      viewport: { width: 680, height: 650 }, deviceScaleFactor: 2,
+      viewport: { width: 680, height: 980 }, deviceScaleFactor: 2,
       locale: 'en-GB', timezoneId: 'UTC',
     });
     const errors = [];
@@ -19,7 +19,7 @@ const path = require('node:path');
     await page.clock.pauseAt(new Date('2026-09-06T12:00:00Z'));
     await page.setContent(`<style>
       body { margin: 0; font: 16px Arial, sans-serif; }
-      main { padding: 24px; background: var(--background); color: var(--text); }
+      main { padding: 24px; background: var(--background); color: var(--text); --primary-text-color:var(--text); --card-background-color:var(--card-background); --divider-color:var(--border); }
       header { margin-bottom: 16px; color: var(--secondary-text-color); font-size: 13px; }
       glucifer-card { display: block; }
     </style><main><header>Glucifer HA · Sample data</header><glucifer-card></glucifer-card></main>`);
@@ -51,16 +51,22 @@ const path = require('node:path');
           mgdl: Math.round(115 + 15 * Math.sin(i / 40) + 7 * Math.sin(i / 17)),
         })).filter((_, i) => !(i > 160 && i < 190) && (!dark || i <= 342));
         if (!dark) readings[readings.length - 1].mgdl = 123;
+        const journal = [
+          {id:'j1',time_ms:now-300*60000,kind:'carbs',amount:35,label:'Carbohydrates'},
+          {id:'j2',time_ms:now-295*60000,kind:'insulin',amount:2.5,label:'Insulin'},
+          {id:'j3',time_ms:now-90*60000,kind:'note',label:'Note',note:'Sample journal note'},
+          {id:'j4',time_ms:now-55*60000,kind:'carbs',amount:12,label:'Carbohydrates'},
+        ];
         const fixture = { states: {
           [entities.glucose]: state(dark ? 'unavailable' : '123', { unit_of_measurement: unit }),
-          [entities.trend]: state(dark ? 'unavailable' : 'Flat'),
+          [entities.trend]: state(dark ? 'unavailable' : 'FortyFiveDown'),
           [entities.delta_mgdl]: state(dark ? 'unavailable' : '0', { unit_of_measurement: unit }),
           [entities.reading_age]: state(dark ? '1080' : '0'),
           [entities.connected]: state('on'), [entities.stale]: state(dark ? 'on' : 'off'),
-        }, callWS: async () => ({ entities, unit, readings }) };
+        }, callWS: async () => ({ entities, unit, readings, journal, journal_enabled:true, journal_history_days:7 }) };
         const card = document.querySelector('glucifer-card');
-        card.setConfig({ entity: entities.glucose, title: 'Glucose', hours: 6 });
         card.hass = fixture;
+        card.setConfig({ entity: entities.glucose, title: 'Glucose', hours: 6, show_journal:true, journal_limit:4 });
       }, dark);
       await page.waitForFunction(() => {
         const card = document.querySelector('glucifer-card');

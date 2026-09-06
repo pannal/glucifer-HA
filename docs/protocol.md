@@ -101,7 +101,7 @@ Private endpoint URLs and source identifiers are not returned.
 ## Backfill activity status
 
 Receivers supporting diagnostic transfer state advertise
-`"capabilities": ["backfill_status"]` in live snapshot acknowledgements.
+`"capabilities": ["backfill_status", "journal_v1"]` in live snapshot acknowledgements.
 Senders must negotiate this capability before posting a status transition:
 
 ```json
@@ -120,3 +120,66 @@ plus `"status": "accepted"`. Retries preserve `status_id`; a changed state gets
 a new ID. A status message cannot contain glucose, history readings, or alerts.
 It updates contact time without changing the live snapshot or its measurement
 time. Senders report transitions, not periodic copies of the same state.
+
+
+## Journal changes (version 2, journal_v1)
+
+Live receipts advertise `journal_v1`. A sender must see that capability and
+establish its source binding before posting journal changes to the same URL.
+Older receivers continue to receive glucose without journal requests.
+
+```json
+{
+  "schema_version": 2,
+  "type": "journal",
+  "source_id": "phone-example",
+  "sequence": 1,
+  "sent_at_ms": 1788696000000,
+  "enabled": true,
+  "history_days": 7,
+  "entries": [
+    {"id": "j42", "time_ms": 1788695900000, "kind": "insulin", "amount": 2.5, "label": "Insulin"}
+  ],
+  "deleted_ids": []
+}
+```
+
+The journal sequence is independent of the live snapshot sequence, positive,
+and persisted across restarts. A retry preserves the entire pending envelope.
+An entry's stable ID identifies an upsert; `deleted_ids` removes entries.
+Entry and source IDs use 1 to 64 ASCII letters, digits, hyphens, or underscores.
+At most 16 upserts and deletions combined are accepted per request. IDs must
+be unique across both lists. Senders also cap serialized bodies at 30,000
+UTF-8 bytes, below the receiver's 32 KiB limit.
+
+All envelope fields shown are required. `enabled` is a strict boolean and
+`history_days` is an integer from 1 to 90. `entries` and `deleted_ids` may
+both be empty for a settings change. When disabled, both must be empty and
+the receiver clears its stored journal.
+
+Each entry has `id`, `time_ms`, `kind`, and `label`. Kinds are `insulin`,
+`carbs`, and `note`. Insulin and carbs require a finite positive `amount`
+no greater than 100,000, in units or grams respectively. Note entries must
+not have an amount. Labels allow up to 128 characters; optional `note` text
+allows up to 256. Extra fields are rejected. Timestamps are positive Unix
+milliseconds and may not exceed `sent_at_ms` by more than two minutes.
+
+The receiver stores the newest 5,000 entries within the selected history
+window. Expired entries are discarded. A receipt contains `schema_version`,
+`type`, `source_id`, `sequence`, and `status`. Status is `accepted`,
+`duplicate` for an exact retry, or `superseded` for an older sequence that
+was not applied. Reusing the current sequence with different content is an
+error. The sender advances its per-entry hash ledger only on a matching
+`accepted` or `duplicate` receipt. Persistence completes before acceptance
+is acknowledged. Journal requests update last contact, never current glucose,
+its measurement time, or alert values.
+
+The authenticated `glucifer/history` response also returns `journal`,
+`journal_enabled`, and `journal_history_days`. The `glucifer/subscribe`
+WebSocket subscription takes the same glucose `entity_id` and requires the
+same entity read permission. It sends `{"changed": true}` when accepted live
+data, glucose history, or journal content changes. Clients then fetch the
+current history. Freshness timer ticks do not generate these events. An
+integration unload sends an additional `"reload": true`; clients should
+resubscribe once the entry is available again. Neither command exposes the
+webhook secret or source identifier.

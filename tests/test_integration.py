@@ -483,3 +483,138 @@ async def test_backfill_status_unavailable_after_contact_is_lost(hass, receiver,
     async_fire_time_changed(hass, dt_util.utcnow())
     await hass.async_block_till_done()
     assert hass.states.get("binary_sensor.phone_backfill_active").state == "unavailable"
+
+
+def journal_batch(snapshot, *, sequence=1, entries=None, deleted=None, enabled=True, days=7):
+    return {
+        "schema_version": 2,
+        "type": "journal",
+        "source_id": snapshot["source_id"],
+        "sequence": sequence,
+        "sent_at_ms": snapshot["sent_at_ms"],
+        "enabled": enabled,
+        "history_days": days,
+        "entries": entries or [],
+        "deleted_ids": deleted or [],
+    }
+
+
+def journal_entry(snapshot, key="j1", amount=2.5):
+    return {
+        "id": key,
+        "time_ms": snapshot["glucose"]["time_ms"],
+        "kind": "insulin",
+        "label": "Rapid",
+        "amount": amount,
+    }
+
+
+async def test_journal_live_create_edit_delete_and_subscription(
+    hass, receiver, snapshot, hass_ws_client
+):
+    entry, client = receiver
+    response = await send(hass, client, snapshot)
+    assert "journal_v1" in (await response.json())["capabilities"]
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "glucifer/subscribe", "entity_id": "sensor.phone_glucose"})
+    assert (await ws.receive_json())["success"]
+    original = deepcopy(entry.runtime_data.data)
+    patch_data = journal_batch(snapshot, entries=[journal_entry(snapshot)])
+    response = await send(hass, client, patch_data)
+    assert response.status == 200 and (await response.json())["status"] == "accepted"
+    event = await ws.receive_json()
+    assert event["type"] == "event" and event["event"] == {"changed": True}
+    assert entry.runtime_data.data == original
+    await ws.send_json({"id": 2, "type": "glucifer/history", "entity_id": "sensor.phone_glucose"})
+    assert (await ws.receive_json())["result"]["journal"] == patch_data["entries"]
+    patch_data = journal_batch(snapshot, sequence=2, entries=[journal_entry(snapshot, amount=3)])
+    await send(hass, client, patch_data)
+    await ws.receive_json()
+    assert entry.runtime_data.journal["entries"][0]["amount"] == 3
+    await send(hass, client, journal_batch(snapshot, sequence=3, deleted=["j1"]))
+    await ws.receive_json()
+    assert entry.runtime_data.journal["entries"] == []
+    assert entry.runtime_data.data == original
+
+
+async def test_journal_receipt_is_durable_and_conflicting_retries_rejected(
+    hass, receiver, snapshot
+):
+    entry, client = receiver
+    await send(hass, client, snapshot)
+    payload = journal_batch(snapshot, entries=[journal_entry(snapshot)])
+    with patch.object(entry.runtime_data.store, "async_save", AsyncMock(side_effect=OSError)):
+        assert (await send(hass, client, payload)).status == 503
+    assert entry.runtime_data.journal["entries"] == []
+    assert (await send(hass, client, payload)).status == 200
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    response = await send(hass, client, payload)
+    assert (await response.json())["status"] == "duplicate"
+    assert len(entry.runtime_data.journal["entries"]) == 1
+    payload["entries"][0]["amount"] = 4
+    assert (await send(hass, client, payload)).status == 422
+
+
+async def test_journal_retention_and_disable_do_not_change_live_glucose(hass, receiver, snapshot):
+    entry, client = receiver
+    await send(hass, client, snapshot)
+    old = journal_entry(snapshot, "old")
+    old["time_ms"] -= 30 * 86400000
+    await send(
+        hass, client, journal_batch(snapshot, days=90, entries=[old, journal_entry(snapshot)])
+    )
+    assert len(entry.runtime_data.journal["entries"]) == 2
+    await send(hass, client, journal_batch(snapshot, sequence=2, days=7))
+    assert [e["id"] for e in entry.runtime_data.journal["entries"]] == ["j1"]
+    await send(hass, client, journal_batch(snapshot, sequence=3, enabled=False))
+    assert entry.runtime_data.journal["entries"] == []
+    assert entry.runtime_data.data == snapshot
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda p: p.update(source_id="another-phone"),
+        lambda p: p.update(sequence=True),
+        lambda p: p.update(history_days=91),
+        lambda p: p.update(enabled="true"),
+        lambda p: p.update(entries=p["entries"] * 17),
+        lambda p: p["entries"][0].update(amount=True),
+        lambda p: p["entries"][0].update(kind=[]),
+        lambda p: p["entries"][0].update(note="x" * 257),
+        lambda p: p.update(deleted_ids=["j1"]),
+        lambda p: p.update(glucose={"mgdl": 1}),
+    ],
+)
+async def test_invalid_journal_is_rejected(hass, receiver, snapshot, mutation):
+    entry, client = receiver
+    await send(hass, client, snapshot)
+    payload = journal_batch(snapshot, entries=[journal_entry(snapshot)])
+    mutation(payload)
+    assert (await send(hass, client, payload)).status == 422
+    assert entry.runtime_data.journal["entries"] == []
+
+
+async def test_journal_subscription_rejects_wrong_entity(hass, receiver, hass_ws_client):
+    ws = await hass_ws_client(hass)
+    await ws.send_json(
+        {"id": 1, "type": "glucifer/subscribe", "entity_id": "sensor.phone_last_contact"}
+    )
+    assert not (await ws.receive_json())["success"]
+
+
+async def test_journal_subscription_unload_notifies_client_and_can_unsubscribe(
+    hass, receiver, snapshot, hass_ws_client
+):
+    entry, client = receiver
+    await send(hass, client, snapshot)
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "glucifer/subscribe", "entity_id": "sensor.phone_glucose"})
+    assert (await ws.receive_json())["success"]
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    event = await ws.receive_json()
+    assert event["event"] == {"changed": True, "reload": True}
+    await ws.send_json({"id": 2, "type": "unsubscribe_events", "subscription": 1})
+    assert (await ws.receive_json())["success"]

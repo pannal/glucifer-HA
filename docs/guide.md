@@ -91,7 +91,7 @@ that source, remove the entry and create a new one.
 The receiver URL contains its secret. Anyone with the complete URL can send
 data to that receiver. Do not include it in screenshots, logs, or issue
 reports. Removing the integration entry revokes the URL and deletes the
-integration's saved snapshot and backfilled history. Home Assistant Recorder has its own retention
+integration's saved snapshot, glucose history, and journal. Home Assistant Recorder has its own retention
 settings for entity history.
 
 ## Data selection
@@ -116,6 +116,8 @@ optional field and each alert type has its own toggle.
 | Sensor activation and estimated expiry | Disabled individually | Timestamp sensors |
 | Sensor warming up | Disabled | Binary sensor |
 | History backfill | Disabled | Timestamped readings in the Glucifer dashboard |
+| Journal insulin and carbs | Disabled | Chart markers and optional card history list |
+| Journal notes | Disabled separately | Note entries and attached notes in the card |
 | Each supported alert | Enabled | Binary sensor |
 
 Select **mg/dL** or **mmol/L** in the receiver options. This applies to glucose,
@@ -178,7 +180,7 @@ contact without changing the measurement or snapshot time.
 
 The Home Assistant diagnostics download contains configuration flags, selected
 field names, and operational status. It omits receiver URLs, source and sensor
-identifiers, glucose values, alert values, and measurement timestamps.
+identifiers, glucose values, alert values, journal entries, and measurement timestamps.
 
 ## Dashboard
 
@@ -188,7 +190,13 @@ reads history through your authenticated Home Assistant connection.
 1. Enable advanced mode in your Home Assistant profile.
 2. Open **Settings > Dashboards > Resources** and add
    `/glucifer/glucifer-card.js` as a **JavaScript module**.
-3. Add a manual card with the YAML below, replacing the glucose entity ID.
+3. Refresh the browser, edit your dashboard, then choose **Add card > Glucifer HA**.
+4. Select the phone's glucose entity. Expand **Display**, **Journal**,
+   **Glucose value colors**, or **Trend arrow colors** to adjust the card.
+   Save the card when finished.
+
+The visual editor uses Home Assistant's native controls, including color
+pickers. Existing YAML configurations still work; the smallest example is:
 
 ```yaml
 type: custom:glucifer-card
@@ -200,7 +208,19 @@ hours: 24
 The card finds the selected receiver's trend, delta, freshness, lifecycle, and
 active alert entities automatically. Its chart supports 1 to 168 hours and
 leaves gaps longer than ten minutes visible. Unknown values remain unknown.
-The **More details** button opens the glucose entity.
+The **More details** button opens the glucose entity. Delta and reading age,
+active alerts, sensor details, and the glucose chart can each be hidden.
+
+The glucose value and trend arrow have separate color controls. Default
+value boundaries are **54, 70, 180, and 250 mg/dL**: dark red below 54, red
+below 70, green from 70 through 180, amber above 180, and red above 250.
+Boundaries are always entered in mg/dL; mmol/L values are converted for the
+color comparison. These are display settings, not treatment targets or
+changes to JugglucoNG's alerts.
+
+The arrow defaults to green for stable, amber for rising or falling, and red
+for rapid changes (double arrows). Each group has its own color picker.
+Either color system can be disabled independently.
 
 For a complete dashboard, copy [examples/dashboard.yaml](../examples/dashboard.yaml)
 into a new dashboard's raw configuration editor and replace its example entity
@@ -244,12 +264,12 @@ trigger updates. Normal cadence follows the connected glucose source.
 | --- | --- | --- |
 | Live events bypass the background interval | On | Live events can send with a one-second minimum, independently of background pacing. Turn off to apply the selected interval to live events too. |
 | Check for missed updates after | 1 hour | Rechecks the data after no successful live push for this period. A successful live push restarts the timer. |
-| Pause between background requests | 1 second | Paces history batches and changed snapshots found by background checks. Pending live updates take priority. |
+| Minimum gap between background requests | 1 second | Paces history batches and changed snapshots found by background checks. Pending live updates take priority. |
 
 The timing controls offer 1, 5, 10, 30, 60, 120, 360, 900, and 1800 seconds,
 plus 1, 6, 12, and 24 hours. Existing selected intervals survive upgrades.
 The request pause limits pending work; it does not schedule continuous sends.
-With live bypass off, the screen labels it **Pause between all requests**.
+With live bypass off, the screen labels it **Minimum gap between all requests**.
 All requests remain at least one second apart. History waits for its next slot
 without polling every second during a long background interval.
 
@@ -258,8 +278,10 @@ A new measurement timestamp counts as changed data even if its glucose value
 is identical. Explicit manual tests and retries of unacknowledged deliveries
 can resend data. Neither changes an old reading's measurement time.
 
-Measurements are rounded to one decimal before sending and in HA, including
-after unit conversion. Timestamps, identifiers, and boolean alerts retain
+Live numeric fields are rounded to one decimal before sending and in HA,
+including after unit conversion. The card displays glucose as whole mg/dL or
+one decimal in mmol/L. Journal amounts preserve the recorded value on the
+wire and display up to two decimal places. Timestamps, identifiers, and boolean alerts retain
 their original types. Unchanged rounded measurements do not trigger extra
 sends. Delivery status refreshes while the NG settings screen is visible.
 
@@ -308,6 +330,52 @@ Assistant's ordinary Recorder graph still records live entity changes; imported
 readings are not injected into Recorder as new state changes. Removing a
 receiver deletes its Glucifer history. Recorder retention is separate.
 
+## Journal
+
+Journal sync requires Glucifer HA **0.3.0+** and a matching JugglucoNG build.
+Enable **Sync journal entries** in the Glucifer destination on the phone. It starts
+off. Enabling it sends insulin and carbohydrate entries, including their
+amounts, preset labels, and original timestamps. **Include notes and note entries**
+starts off separately; turn it on to include note entries and notes attached
+to insulin or carbohydrate entries.
+
+Creating, editing, or deleting an entry wakes the sender. Journal changes
+have their own delivery sequence and do not wait for a new glucose reading.
+The existing **Live events bypass the background interval** option applies;
+all requests still share a one-second minimum gap. Retries preserve the
+pending change, and acknowledged entries are only sent again if they change.
+
+The sender offers **1, 3, 7, 14, 30, 60, or 90 days** of journal history,
+with **7 days** selected initially. HA stores at most **5,000 entries** within
+that window, retaining the newest. Changes travel in batches of at most
+16 entries or deletions. Initial journal transfer and glucose history backfill
+are separate; **Backfill active** describes glucose history transfers.
+
+In the card's visual editor, the **Journal** section controls:
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| Show journal points on chart | On | Marks entries at their original time within the chart window. |
+| Show journal history list | Off | Adds a selectable list, newest first. |
+| Journal history days | 7 | Filters the card to 1 through 90 days, limited by the sender's retained data. |
+| Maximum entries in the list | 25 | Shows up to 1 through 200 entries. |
+| Journal entry types | All three | Filters insulin, carbohydrates, and notes locally. |
+
+Markers use a purple triangle for insulin, an orange circle for carbs, and a
+teal square for notes. Select a marker or list entry to read its details.
+Markers use the nearest measured glucose within ten minutes for their height;
+without a nearby reading they sit along the bottom of the chart. They do not
+create glucose measurements or fill gaps. Open cards receive change
+notifications through the authenticated HA connection, so journal edits
+appear without waiting for the chart's background refresh.
+
+Hiding a card section does not stop sync. Turning **Sync journal entries** off on the
+phone clears HA's journal after the next successful journal request. Turning
+notes off removes them as entries are updated or deleted in subsequent
+batches. If the phone cannot reach HA, its previously delivered data remains
+until it expires or the integration entry is removed. Journal data is stored
+by Glucifer, outside HA Recorder; removing the integration deletes that copy.
+
 ## Access away from home
 
 **Accept local requests only** is off by default for new receivers. Existing
@@ -329,6 +397,8 @@ expose the phone's HTTP server.
 | Glucose is unavailable but alerts update | Check the measurement time. The glucose reading may be stale even though the phone is communicating. |
 | Optional entity is missing | Enable that field in JugglucoNG and wait for an accepted snapshot. |
 | Alert becomes unavailable after disabling it | Expected: disabled does not mean the alert condition is false. |
+| Journal does not appear | Update both HA and the phone, enable Sync journal entries, and check the card's journal filters. |
+| Visual editor or arrows are missing | Refresh the browser after updating. If cached, use `/glucifer/glucifer-card.js?v=0.3.0` for the resource URL. |
 | Source mismatch | The endpoint already belongs to another source. Create a separate receiver entry. |
 
 When reporting a problem, include both software versions and the error code.
