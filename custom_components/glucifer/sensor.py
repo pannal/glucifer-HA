@@ -68,7 +68,9 @@ class JugglucoSensor(JugglucoEntity, SensorEntity):
         elif key == "rate_mgdl_min":
             unit = f"{self.display_unit}/min"
         if kind == "number" and key not in {"sensor_generation", "reading_age", "history_count"}:
-            self._attr_suggested_display_precision = 1
+            self._attr_suggested_display_precision = (
+                0 if key in {"glucose", "raw_mgdl", "auto_mgdl"} and unit == "mg/dL" else 1
+            )
         self._attr_native_unit_of_measurement = unit
         if kind == "number" and key not in ("sensor_generation", "rate_mgdl_min"):
             self._attr_state_class = SensorStateClass.MEASUREMENT

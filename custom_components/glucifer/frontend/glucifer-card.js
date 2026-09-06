@@ -51,8 +51,9 @@ class GluciferCard extends HTMLElement {
     const valid = glucose && !["unknown", "unavailable"].includes(glucose.state);
     const unit = glucose?.attributes.unit_of_measurement || this.data?.unit || "mg/dL";
     const value = valid ? Number(glucose.state) : NaN;
+    const glucosePrecision = unit === "mg/dL" ? 0 : 1;
     text("h2", this.config.title || "Glucifer HA");
-    text(".glucose", Number.isFinite(value) ? `${value.toFixed(1)} ${unit}` : "Unavailable");
+    text(".glucose", Number.isFinite(value) ? `${value.toFixed(glucosePrecision)} ${unit}` : "Unavailable");
     const age = state("reading_age")?.state;
     const trend = state("trend")?.state;
     const delta = state("delta_mgdl");
@@ -76,7 +77,7 @@ class GluciferCard extends HTMLElement {
     root.querySelector("path").setAttribute("d", path);
     text(".start", new Date(since).toLocaleString());
     text(".end", new Date(until).toLocaleTimeString());
-    text(".range", points.length ? `${min.toFixed(1)} to ${max.toFixed(1)} ${unit}` : "No history");
+    text(".range", points.length ? `${min.toFixed(glucosePrecision)} to ${max.toFixed(glucosePrecision)} ${unit}` : "No history");
     text(".history", this.error || `${points.length} readings at their measurement times. Gaps over 10 min remain visible.`);
     Object.keys(entities).filter(key => key.startsWith("alert_") && state(key)?.state === "on").forEach(key => {
       const li = document.createElement("li"); li.textContent = state(key).attributes.friendly_name; root.querySelector("ul").append(li);
