@@ -11,10 +11,11 @@ history backfill. No separate server or MQTT broker required.
 **Glucifer HA** outbound API preset. That sender is not in an upstream release
 yet. Live phone-to-Home-Assistant testing is still pending.
 
-**Not a medical device.** Do not use readings, alerts, or automations for
-treatment decisions, medication delivery, or emergency monitoring. Data may
-be delayed, missing, stale, or incorrect. An alert being off does not establish
-that glucose is safe. [Full disclaimer](docs/guide.md#medical-disclaimer).
+> [!CAUTION]
+> **Not a medical device.** Do not use readings, alerts, or automations for
+> treatment decisions, medication delivery, or emergency monitoring. Data may
+> be delayed, missing, stale, or incorrect. An alert being off does not establish
+> that glucose is safe. [Full disclaimer](docs/guide.md#medical-disclaimer).
 
 ## Quick setup
 

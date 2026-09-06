@@ -4,21 +4,22 @@
 
 ## Medical disclaimer
 
-**Glucifer HA is not a medical device.** It is experimental software for
-displaying data and experimenting with Home Assistant automations. It is not
-intended to diagnose, treat, cure, or prevent any disease, or to replace a
-glucose monitor, medical advice, or a medical alert system.
-
-Do not use its readings, alert entities, or automations to make insulin dosing
-or other treatment decisions, control medication delivery, or provide
-emergency monitoring. Use your prescribed monitoring equipment and follow
-your clinician's guidance.
-
-Data can be delayed, missing, stale, or incorrect. Network outages, phone
-restrictions, restarts, and software faults can prevent both readings and
-alerts from arriving. An alert shown as off does not establish that your
-glucose is safe. The software is provided without warranty, as described in
-the [license](../LICENSE).
+> [!CAUTION]
+> **Glucifer HA is not a medical device.** It is experimental software for
+> displaying data and experimenting with Home Assistant automations. It is not
+> intended to diagnose, treat, cure, or prevent any disease, or to replace a
+> glucose monitor, medical advice, or a medical alert system.
+>
+> Do not use its readings, alert entities, or automations to make insulin dosing
+> or other treatment decisions, control medication delivery, or provide
+> emergency monitoring. Use your prescribed monitoring equipment and follow
+> your clinician's guidance.
+>
+> Data can be delayed, missing, stale, or incorrect. Network outages, phone
+> restrictions, restarts, and software faults can prevent both readings and
+> alerts from arriving. An alert shown as off does not establish that your
+> glucose is safe. The software is provided without warranty, as described in
+> the [license](../LICENSE).
 
 ## Requirements
 
