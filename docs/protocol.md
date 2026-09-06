@@ -96,3 +96,27 @@ The authenticated `glucifer/history` WebSocket command accepts the receiver's
 glucose `entity_id` and returns retained readings, entity IDs, and the configured
 unit. Home Assistant read permission for that glucose entity is required.
 Private endpoint URLs and source identifiers are not returned.
+
+
+## Backfill activity status
+
+Receivers supporting diagnostic transfer state advertise
+`"capabilities": ["backfill_status"]` in live snapshot acknowledgements.
+Senders must negotiate this capability before posting a status transition:
+
+```json
+{
+  "schema_version": 2,
+  "type": "backfill_status",
+  "source_id": "phone-example",
+  "status_id": "transition-example",
+  "active": true
+}
+```
+
+`active` is a strict boolean. The source must already be bound by a live
+snapshot. The receiver durably saves the state and replies with the same fields
+plus `"status": "accepted"`. Retries preserve `status_id`; a changed state gets
+a new ID. A status message cannot contain glucose, history readings, or alerts.
+It updates contact time without changing the live snapshot or its measurement
+time. Senders report transitions, not periodic copies of the same state.

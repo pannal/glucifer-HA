@@ -420,3 +420,66 @@ async def test_setup_translation_does_not_reuse_old_url_template(hass):
     assert "Configure" in description
     assert "connection URL" in description
     assert "{url}" not in description
+
+
+def backfill_status(snapshot, active):
+    return {
+        "schema_version": 2,
+        "type": "backfill_status",
+        "source_id": snapshot["source_id"],
+        "status_id": "transfer-on" if active else "transfer-off",
+        "active": active,
+    }
+
+
+async def test_backfill_status_transitions_persist_without_changing_glucose(
+    hass, receiver, snapshot
+):
+    entry, client = receiver
+    assert hass.states.get("binary_sensor.phone_backfill_active").state == "unavailable"
+    receipt = await (await send(hass, client, snapshot)).json()
+    assert "backfill_status" in receipt["capabilities"]
+    active = backfill_status(snapshot, True)
+    response = await send(hass, client, active)
+    assert (await response.json()) == {**active, "status": "accepted"}
+    assert hass.states.get("binary_sensor.phone_backfill_active").state == "on"
+    assert entry.runtime_data.data["sequence"] == snapshot["sequence"]
+    assert entry.runtime_data.data["glucose"] == snapshot["glucose"]
+    await send(hass, client, history_batch(snapshot))
+    assert hass.states.get("binary_sensor.phone_backfill_active").state == "on"
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.phone_backfill_active").state == "on"
+    assert (await send(hass, client, backfill_status(snapshot, False))).status == 200
+    assert hass.states.get("binary_sensor.phone_backfill_active").state == "off"
+    assert hass.states.get("sensor.phone_glucose").state == "123"
+
+
+async def test_backfill_status_rejects_unknown_source_and_non_boolean(hass, receiver, snapshot):
+    _, client = receiver
+    assert (await send(hass, client, backfill_status(snapshot, True))).status == 422
+    await send(hass, client, snapshot)
+    for change in ({"active": 1}, {"source_id": "other"}, {"glucose": snapshot["glucose"]}):
+        assert (
+            await send(hass, client, {**backfill_status(snapshot, True), **change})
+        ).status == 422
+    assert hass.states.get("binary_sensor.phone_backfill_active").state == "unavailable"
+
+
+async def test_backfill_status_store_failure_keeps_previous_state(hass, receiver, snapshot):
+    entry, client = receiver
+    await send(hass, client, snapshot)
+    await send(hass, client, backfill_status(snapshot, True))
+    with patch.object(entry.runtime_data.store, "async_save", side_effect=OSError):
+        assert (await send(hass, client, backfill_status(snapshot, False))).status == 503
+    assert hass.states.get("binary_sensor.phone_backfill_active").state == "on"
+
+
+async def test_backfill_status_unavailable_after_contact_is_lost(hass, receiver, snapshot, freezer):
+    _, client = receiver
+    await send(hass, client, snapshot)
+    await send(hass, client, backfill_status(snapshot, True))
+    freezer.tick(timedelta(seconds=301))
+    async_fire_time_changed(hass, dt_util.utcnow())
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.phone_backfill_active").state == "unavailable"

@@ -42,10 +42,11 @@ JugglucoNG build noted above.
    Turn the destination on. NG saves changes automatically.
 6. Choose what to send. Glucose and measurement time are always enabled;
    trend, delta, and alerts start enabled. Other fields and history backfill
-   start disabled. New glucose readings and saved changes trigger updates.
-   The minimum send interval defaults to **1 second**; an inactivity fallback
-   refreshes after **360 seconds** without a successful live push. Both offer
-   1, 5, 10, 30, 60, 120, or 360 seconds.
+   start disabled. **Live events bypass the background interval** starts on:
+   glucose, journal, and alert changes send promptly, with a one-second minimum.
+   Background sends default to one-second spacing; inactivity checks default
+   to **1 hour**. Both controls offer intervals up to **24 hours**. Unchanged,
+   acknowledged data is skipped. HA's **Backfill active** sensor shows transfers.
 7. Tap **Send test message** in JugglucoNG. Check that HA shows the glucose
    value and measurement time, then tap **Done** in NG.
 

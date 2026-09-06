@@ -237,16 +237,23 @@ glucose source. A receiver still needs a glucose reading to accept a snapshot.
 ## Update timing and precision
 
 New glucose readings, journal changes, alert changes, and destination edits
-trigger updates. Normal cadence follows the connected glucose source. A
-successful live push restarts the inactivity fallback, which defaults to
-360 seconds. There is no one-second background polling loop.
+trigger updates. Normal cadence follows the connected glucose source.
 
-The minimum interval between requests defaults to one second and applies to
-live snapshots, manual tests, retries, and backfill together for each phone.
-Both this limit and the inactivity fallback offer 1, 5, 10, 30, 60, 120, and
-360 seconds. Changes received while a request is rate-limited are included
-in the next snapshot. A fallback or manual test does not make an old glucose
-reading fresh.
+| Setting | Default | Behavior |
+| --- | --- | --- |
+| Live events bypass the background interval | On | Live events can send with a one-second minimum, independently of background pacing. Turn off to apply the selected interval to live events too. |
+| Background send interval | 1 second | Paces history batches and changed snapshots found by background checks. Pending live updates take priority. |
+| Check after inactivity | 1 hour | Rechecks the data after no successful live push for this period. A successful live push restarts the timer. |
+
+The timing controls offer 1, 5, 10, 30, 60, 120, 360, 900, and 1800 seconds,
+plus 1, 6, 12, and 24 hours. Existing selected intervals survive upgrades.
+All requests remain at least one second apart. History waits for its next slot
+without polling every second during a long background interval.
+
+Unchanged, acknowledged snapshots are skipped regardless of elapsed time.
+A new measurement timestamp counts as changed data even if its glucose value
+is identical. Explicit manual tests and retries of unacknowledged deliveries
+can resend data. Neither changes an old reading's measurement time.
 
 Measurements are rounded to one decimal before sending and in HA, including
 after unit conversion. Timestamps, identifiers, and boolean alerts retain
@@ -278,8 +285,18 @@ Historical batches contain only glucose and original measurement timestamps.
 They cannot carry alerts, replace the current reading, or make stale data
 fresh. Each batch contains at most 256 readings. The sender saves a pending
 batch before delivery and advances its cursor only after a matching receipt.
-It revisits the seven-day window hourly to catch readings that arrived late
-from the sensor. Available history depends on what the phone has retained.
+It revisits the seven-day window hourly to catch late arrivals and skips
+acknowledged timestamps, including readings already sent live. The acknowledgement
+record is bounded to the receiver's 20,160-reading limit. When upgrading from a
+sender that only stored a cursor, the already acknowledged prefix is kept;
+that old prefix is not scanned for gaps. Available history depends on what the
+phone has retained.
+
+The diagnostic binary sensor **Backfill active** is on during a transfer and
+off when it finishes or backfill is turned off. It stays on between paced batches.
+If contact is lost, it becomes unavailable. This requires the matching sender;
+older senders leave its state unavailable. Status messages contain no glucose
+or alert values and are sent only when the state changes or a receipt needs retrying.
 
 The receiver retains up to seven days or 20,160 readings, whichever is smaller,
 including readings received live. Repeated timestamps retain the first recorded

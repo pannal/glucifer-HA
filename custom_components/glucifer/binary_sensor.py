@@ -17,6 +17,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             JugglucoHealth(coordinator, "connected", "Connected"),
             JugglucoHealth(coordinator, "stale", "Glucose stale"),
             JugglucoWarmup(coordinator, "sensor_warmup", "Sensor warming up"),
+            JugglucoBackfill(coordinator, "backfill_active", "Backfill active"),
         ]
     )
 
@@ -84,3 +85,16 @@ class JugglucoWarmup(JugglucoEntity, BinarySensorEntity):
         return (
             self.coordinator.data["fields"].get("sensor_warmup") if self.coordinator.data else None
         )
+
+
+class JugglucoBackfill(JugglucoEntity, BinarySensorEntity):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:database-arrow-up"
+
+    @property
+    def available(self):
+        return self.coordinator.connected and self.coordinator.backfill_active is not None
+
+    @property
+    def is_on(self):
+        return self.coordinator.backfill_active

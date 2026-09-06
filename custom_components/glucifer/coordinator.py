@@ -12,7 +12,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import DEFAULT_STALE_SECONDS, DOMAIN, HISTORY_DAYS, MAX_HISTORY_POINTS
-from .protocol import InvalidSnapshot, classify_snapshot, validate_history, validate_snapshot
+from .protocol import (
+    InvalidSnapshot,
+    classify_snapshot,
+    validate_backfill_status,
+    validate_history,
+    validate_snapshot,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +34,7 @@ class JugglucoCoordinator(DataUpdateCoordinator):
         self.data = None
         self.history = []
         self.last_contact_ms = None
+        self.backfill_active = None
         # Capture the registered secret; entry.data may change before unload.
         self.webhook_id = entry.data["webhook_id"]
 
@@ -40,6 +47,8 @@ class JugglucoCoordinator(DataUpdateCoordinator):
                 contact = saved.get("last_contact_ms")
                 if type(contact) is int and 0 < contact <= self.now_ms + 120000:
                     self.last_contact_ms = contact
+                if type(saved.get("backfill_active")) is bool:
+                    self.backfill_active = saved["backfill_active"]
                 points = saved.get("history", [])
                 # Apply the same validation to saved history in bounded chunks.
                 validated = []
@@ -97,12 +106,21 @@ class JugglucoCoordinator(DataUpdateCoordinator):
                 points.setdefault(point["time_ms"], point)
         return [points[key] for key in sorted(points)[-MAX_HISTORY_POINTS:]]
 
-    async def _save(self, snapshot, history, contact):
+    async def _save(self, snapshot, history, contact, backfill_active=None):
         await self.store.async_save(
-            {"snapshot": snapshot, "history": history, "last_contact_ms": contact}
+            {
+                "snapshot": snapshot,
+                "history": history,
+                "last_contact_ms": contact,
+                "backfill_active": self.backfill_active
+                if backfill_active is None
+                else backfill_active,
+            }
         )
 
     async def async_accept(self, payload):
+        if isinstance(payload, dict) and payload.get("type") == "backfill_status":
+            return await self.async_accept_backfill_status(payload)
         if isinstance(payload, dict) and payload.get("type") == "history":
             return await self.async_accept_history(payload)
         incoming = validate_snapshot(payload, self.now_ms)
@@ -124,6 +142,7 @@ class JugglucoCoordinator(DataUpdateCoordinator):
                 "sequence": incoming["sequence"],
                 "status": status,
                 "supported_versions": [1, 2],
+                "capabilities": ["backfill_status"],
                 "history_days": HISTORY_DAYS,
             }
 
@@ -147,3 +166,15 @@ class JugglucoCoordinator(DataUpdateCoordinator):
                 "status": "accepted",
                 "through_ms": incoming["readings"][-1]["time_ms"],
             }
+
+    async def async_accept_backfill_status(self, payload):
+        incoming = validate_backfill_status(payload)
+        async with self.lock:
+            if self.data is None or incoming["source_id"] != self.data["source_id"]:
+                raise InvalidSnapshot("source_mismatch")
+            contact = self.now_ms
+            await self._save(self.data, self.history, contact, incoming["active"])
+            self.backfill_active = incoming["active"]
+            self.last_contact_ms = contact
+            self.async_update_listeners()
+            return {**incoming, "status": "accepted"}

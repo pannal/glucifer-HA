@@ -131,3 +131,25 @@ def validate_history(payload, now_ms):
             raise InvalidSnapshot("invalid_glucose")
         previous = stamp
     return deepcopy(payload)
+
+
+def validate_backfill_status(payload):
+    """Validate a diagnostic transition without accepting readings or alerts."""
+    if not isinstance(payload, dict) or set(payload) != {
+        "schema_version",
+        "type",
+        "source_id",
+        "status_id",
+        "active",
+    }:
+        raise InvalidSnapshot("invalid_backfill_status")
+    if type(payload["schema_version"]) is not int or payload["schema_version"] != 2:
+        raise InvalidSnapshot("unsupported_version")
+    if payload["type"] != "backfill_status" or type(payload["active"]) is not bool:
+        raise InvalidSnapshot("invalid_backfill_status")
+    for key in ("source_id", "status_id"):
+        if not isinstance(payload[key], str) or not re.fullmatch(
+            r"[A-Za-z0-9_-]{1,64}", payload[key]
+        ):
+            raise InvalidSnapshot("invalid_backfill_status")
+    return deepcopy(payload)
