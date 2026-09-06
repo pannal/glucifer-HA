@@ -1,0 +1,20 @@
+# Add /glucifer/glucifer-card.js as a JavaScript module dashboard resource first.
+# Replace sensor.phone_glucose with your receiver's glucose entity.
+title: Glucifer
+views:
+  - title: Glucose
+    path: glucose
+    icon: mdi:water
+    cards:
+      - type: custom:glucifer-card
+        entity: sensor.phone_glucose
+        title: Glucose
+        hours: 24
+      - type: entities
+        title: Connection
+        entities:
+          - binary_sensor.phone_connected
+          - binary_sensor.phone_glucose_stale
+          - sensor.phone_last_contact
+          - sensor.phone_measurement_time
+          - sensor.phone_reading_age

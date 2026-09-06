@@ -1,0 +1,6 @@
+{
+  "name": "glucifer-ha-dashboard-tests",
+  "private": true,
+  "scripts": {"test": "node tests/frontend/check.cjs"},
+  "devDependencies": {"playwright": "1.63.0"}
+}

@@ -23,6 +23,17 @@ jobs:
       - run: python -m pytest --timeout=30
       - run: ruff check .
       - run: ruff format --check .
+  dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
   hassfest:
     runs-on: ubuntu-latest
     steps:
@@ -34,3 +45,4 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
+          comment: false

@@ -1,0 +1,68 @@
+blueprint:
+  name: Glucifer alert display actions
+  description: >-
+    Run informational light, display or notification actions when a selected
+    alert changes from off to on. Unknown and unavailable states do not trigger
+    it. Quiet hours and a cooldown suppress repeated actions. This is not
+    medical monitoring and must not control medication delivery.
+  domain: automation
+  input:
+    alert_entity:
+      name: Glucifer alert
+      selector:
+        entity:
+          filter:
+            - integration: glucifer
+              domain: binary_sensor
+    actions:
+      name: Informational actions
+      selector:
+        action: {}
+    quiet_enabled:
+      name: Enable quiet hours
+      default: true
+      selector:
+        boolean: {}
+    quiet_start:
+      name: Quiet hours start
+      default: '22:00:00'
+      selector:
+        time: {}
+    quiet_end:
+      name: Quiet hours end
+      default: '07:00:00'
+      selector:
+        time: {}
+    cooldown_minutes:
+      name: Minimum minutes between actions
+      default: 15
+      selector:
+        number:
+          min: 0
+          max: 1440
+          unit_of_measurement: min
+          mode: box
+variables:
+  quiet_enabled: !input quiet_enabled
+  quiet_start: !input quiet_start
+  quiet_end: !input quiet_end
+  cooldown: !input cooldown_minutes
+triggers:
+  - trigger: state
+    entity_id: !input alert_entity
+    from: 'off'
+    to: 'on'
+conditions:
+  - condition: template
+    value_template: >-
+      {% set t = now().strftime('%H:%M:%S') %}
+      {{ not quiet_enabled or quiet_start == quiet_end or
+         (not (quiet_start <= t < quiet_end) if quiet_start < quiet_end
+          else not (t >= quiet_start or t < quiet_end)) }}
+  - condition: template
+    value_template: >-
+      {{ this.attributes.last_triggered is none or
+         as_timestamp(now()) - as_timestamp(this.attributes.last_triggered) >= cooldown * 60 }}
+actions: !input actions
+mode: single
+max_exceeded: silent

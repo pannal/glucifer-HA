@@ -67,7 +67,7 @@ def test_glucose_time_cannot_regress(snapshot):
 
 @pytest.mark.parametrize(
     "key,value",
-    [("sequence", True), ("sequence", 0), ("schema_version", True), ("schema_version", 2)],
+    [("sequence", True), ("sequence", 0), ("schema_version", True), ("schema_version", 3)],
 )
 def test_envelope_types(snapshot, key, value):
     snapshot[key] = value
@@ -88,3 +88,44 @@ def test_extreme_numbers_are_validation_errors(snapshot):
     snapshot["fields"]["iob_u"] = 10**500
     with pytest.raises(InvalidSnapshot, match="invalid_number"):
         validate_snapshot(snapshot, snapshot["sent_at_ms"])
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("sensor_warmup", 1),
+        ("sensor_warmup", "false"),
+        ("sensor_started_ms", True),
+        ("sensor_expires_ms", -1),
+        ("sensor_expires_ms", 1.5),
+    ],
+)
+def test_lifecycle_types(snapshot, field, value):
+    snapshot["schema_version"] = 2
+    snapshot["fields"][field] = value
+    with pytest.raises(InvalidSnapshot):
+        validate_snapshot(snapshot, snapshot["sent_at_ms"])
+
+
+def test_history_batch_bounds_and_order(snapshot):
+    from custom_components.glucifer.protocol import validate_history
+
+    point = snapshot["glucose"]
+    batch = {
+        "schema_version": 2,
+        "type": "history",
+        "source_id": "phone",
+        "batch_id": "batch",
+        "readings": [point],
+    }
+    assert validate_history(batch, snapshot["sent_at_ms"])["readings"] == [point]
+    for readings in [
+        [],
+        [point, point],
+        [point] * 257,
+        [{**point, "mgdl": True}],
+        [{**point, "mgdl": float("nan")}],
+        [{**point, "time_ms": snapshot["sent_at_ms"] + 120001}],
+    ]:
+        with pytest.raises(InvalidSnapshot):
+            validate_history({**batch, "readings": readings}, snapshot["sent_at_ms"])

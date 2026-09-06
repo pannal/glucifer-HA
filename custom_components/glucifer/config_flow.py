@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Create a private receiver endpoint for each sender."""
 
+from html import escape
+
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components import webhook
@@ -21,6 +23,9 @@ def schema(options=None):
     options = options or {}
     return vol.Schema(
         {
+            vol.Required("glucose_unit", default=options.get("glucose_unit", "mg/dL")): vol.In(
+                ["mg/dL", "mmol/L"]
+            ),
             vol.Required("local_only", default=options.get("local_only", True)): bool,
             vol.Required(
                 "stale_seconds", default=options.get("stale_seconds", DEFAULT_STALE_SECONDS)
@@ -66,7 +71,7 @@ class JugglucoFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="receiver",
             data_schema=schema(),
-            description_placeholders={"url": endpoint(self.hass, self._webhook_id)},
+            description_placeholders=placeholders(self.hass, self._webhook_id),
         )
 
     @staticmethod
@@ -78,11 +83,35 @@ class JugglucoFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class JugglucoOptions(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            self._options = {
+                key: value for key, value in user_input.items() if key != "rotate_secret"
+            }
+            if user_input.get("rotate_secret"):
+                self._new_webhook_id = webhook.async_generate_id()
+                return await self.async_step_rotate()
+            return self.async_create_entry(title="", data=self._options)
         return self.async_show_form(
             step_id="init",
-            data_schema=schema(self.config_entry.options),
-            description_placeholders={
-                "url": endpoint(self.hass, self.config_entry.data["webhook_id"]),
-            },
+            data_schema=schema(self.config_entry.options).extend(
+                {vol.Optional("rotate_secret", default=False): bool}
+            ),
+            description_placeholders=placeholders(self.hass, self.config_entry.data["webhook_id"]),
         )
+
+    async def async_step_rotate(self, user_input=None):
+        if user_input is not None:
+            self.hass.config_entries.async_update_entry(
+                self.config_entry,
+                data={**self.config_entry.data, "webhook_id": self._new_webhook_id},
+            )
+            return self.async_create_entry(title="", data=self._options)
+        return self.async_show_form(
+            step_id="rotate",
+            data_schema=vol.Schema({}),
+            description_placeholders=placeholders(self.hass, self._new_webhook_id),
+        )
+
+
+def placeholders(hass, webhook_id):
+    url = endpoint(hass, webhook_id)
+    return {"url": url, "qr": escape(url, quote=True)}

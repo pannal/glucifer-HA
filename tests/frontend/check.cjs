@@ -1,0 +1,33 @@
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+(async () => {
+  const browser = await chromium.launch({headless:true});
+  const page = await browser.newPage({viewport:{width:640,height:720}});
+  const errors=[];page.on('pageerror', error=>errors.push(String(error)));
+  await page.setContent('<style>body{font-family:Arial;background:#f4f6f8;--primary-color:#007d82;--secondary-text-color:#58656d;--warning-color:#a05300}ha-card{display:block;background:white;border-radius:16px}</style><glucifer-card></glucifer-card>');
+  await page.addScriptTag({path:path.join(__dirname, '../../custom_components/glucifer/frontend/glucifer-card.js')});
+  await page.evaluate(()=>{
+    const now=Date.now();
+    const entities={glucose:'sensor.phone_glucose',trend:'sensor.phone_trend',delta_mgdl:'sensor.phone_delta',reading_age:'sensor.phone_age',connected:'binary_sensor.phone_connected',stale:'binary_sensor.phone_stale',alert_high:'binary_sensor.phone_high'};
+    const state=(state,attributes={})=>({state,attributes});
+    window.fixture={states:{'sensor.phone_glucose':state('123',{unit_of_measurement:'mg/dL'}),'sensor.phone_trend':state('Flat'),'sensor.phone_delta':state('0',{unit_of_measurement:'mg/dL'}),'sensor.phone_age':state('60'),'binary_sensor.phone_connected':state('on'),'binary_sensor.phone_stale':state('off'),'binary_sensor.phone_high':state('on',{friendly_name:'High glucose alert <img src=x onerror=alert(1)>'})},callWS:async()=>({entities,unit:'mg/dL',readings:[{time_ms:now-7200000,mgdl:100},{time_ms:now-7140000,mgdl:110},{time_ms:now-60000,mgdl:123},{time_ms:now,mgdl:123}]})};
+    const card=document.querySelector('glucifer-card');
+    card.setConfig({entity:'sensor.phone_glucose',hours:6});card.hass=window.fixture;
+    card.addEventListener('hass-more-info',event=>window.moreInfo=event.detail.entityId);
+  });
+  await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.history').textContent.startsWith('4 readings'));
+  const root=page.locator('glucifer-card');
+  assert.equal(await root.locator('.glucose').textContent(),'123 mg/dL');
+  assert.equal((await root.locator('path').getAttribute('d')).match(/M/g).length,2);
+  assert.equal(await root.locator('img').count(),0);
+  await root.locator('button').click();assert.equal(await page.evaluate(()=>window.moreInfo),'sensor.phone_glucose');
+  if (process.env.GLUCIFER_SCREENSHOT) await page.screenshot({path:process.env.GLUCIFER_SCREENSHOT});
+  await page.evaluate(()=>{window.fixture.states['sensor.phone_glucose']={state:'6.8',attributes:{unit_of_measurement:'mmol/L'}};window.fixture.states['binary_sensor.phone_stale'].state='on';document.querySelector('glucifer-card').hass=window.fixture;});
+  assert.equal(await root.locator('.glucose').textContent(),'6.8 mmol/L');
+  assert.match(await root.locator('.health').textContent(),/stale/);
+  await page.evaluate(()=>{window.fixture.states['sensor.phone_glucose'].state='unavailable';document.querySelector('glucifer-card').hass=window.fixture;});
+  assert.equal(await root.locator('.glucose').textContent(),'Unavailable');
+  assert.deepEqual(errors,[]);
+  await browser.close();console.log('Dashboard browser checks passed: values, units, history gaps, stale/unavailable states, safe text rendering, more-info interaction.');
+})();

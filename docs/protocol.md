@@ -1,4 +1,4 @@
-# Glucifer HA snapshot protocol, version 1
+# Glucifer HA protocol, versions 1 and 2
 
 Send UTF-8 JSON with HTTP POST to the private receiver URL. The integration
 accepts at most 32 KiB per request. A snapshot replaces all optional fields
@@ -36,8 +36,10 @@ numeric zero or a cleared alert. Alerts accept only JSON booleans or null.
 
 Supported field names and units are defined in
 [`const.py`](../custom_components/glucifer/const.py). Unknown field names,
-unknown alert names, and unsupported schema versions are rejected. A sender
-must negotiate a future protocol version before introducing new keys.
+unknown alert names, and unsupported schema versions are rejected. Version 2 adds `sensor_started_ms` and `sensor_expires_ms` as positive Unix
+milliseconds, plus `sensor_warmup` as boolean or null. Version 1 does not
+accept these fields. All new lifecycle fields remain optional. Receipts echo
+the request version and advertise `supported_versions: [1, 2]`.
 
 An accepted request returns:
 
@@ -55,3 +57,42 @@ Errors return JSON with an `error` string: malformed JSON uses HTTP 400,
 oversized bodies 413, invalid snapshots 422, and storage failures 503.
 Acceptance is acknowledged only after saving the snapshot. Implementations
 must not log payloads or private endpoint URLs on validation failures.
+
+
+## Historical batches (version 2)
+
+A sender enables history separately from its live optional fields. It first
+establishes its source binding with a current snapshot. It then posts bounded,
+strictly ordered batches to the same URL:
+
+```json
+{
+  "schema_version": 2,
+  "type": "history",
+  "source_id": "c97efb6d-448b-4ae1-bffc-c88be23e4983",
+  "batch_id": "d8b99c03-22e2-433f-aa27-b3dcba314564",
+  "readings": [{"time_ms": 1788695900000, "mgdl": 120}]
+}
+```
+
+The source and batch identifiers use the same character and length bounds.
+There must be 1 to 256 readings; each contains exactly `time_ms` and `mgdl`.
+The glucose bounds match snapshots. Future timestamps beyond the clock-skew
+allowance and readings newer than the receiver's current measurement are
+rejected. Additional envelope fields, including alerts, are rejected.
+
+A receipt echoes `schema_version`, `type`, `source_id`, and `batch_id`, with
+`status: "accepted"` and `through_ms` equal to the final reading timestamp.
+The sender verifies all fields before advancing its saved history cursor.
+The receiver saves the merged history before issuing this receipt.
+
+History is keyed by original timestamp. Existing values win on duplicate
+or conflicting timestamps, making retries idempotent without keeping an
+unbounded set of batch IDs. Readings older than seven days are acknowledged
+but discarded; the most recent 20,160 points are retained. The import only
+updates history and contact diagnostics, never current glucose or alert states.
+
+The authenticated `glucifer/history` WebSocket command accepts the receiver's
+glucose `entity_id` and returns retained readings, entity IDs, and the configured
+unit. Home Assistant read permission for that glucose entity is required.
+Private endpoint URLs and source identifiers are not returned.

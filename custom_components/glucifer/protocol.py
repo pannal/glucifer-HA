@@ -5,7 +5,7 @@ import math
 import re
 from copy import deepcopy
 
-from .const import ALERTS, FIELDS
+from .const import ALERTS, FIELDS, LIFECYCLE_FIELDS, MAX_HISTORY_BATCH
 
 
 class InvalidSnapshot(ValueError):
@@ -20,7 +20,7 @@ def validate_snapshot(payload: object, now_ms: int) -> dict:
     """Return a validated copy. Absence and null never mean zero or false."""
     if not isinstance(payload, dict) or type(payload.get("schema_version")) is not int:
         raise InvalidSnapshot("invalid_envelope")
-    if payload["schema_version"] != 1:
+    if payload["schema_version"] not in (1, 2):
         raise InvalidSnapshot("unsupported_version")
     source = payload.get("source_id")
     if not isinstance(source, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", source):
@@ -45,10 +45,18 @@ def validate_snapshot(payload: object, now_ms: int) -> dict:
         raise InvalidSnapshot("invalid_fields")
     if fields.keys() - FIELDS.keys() or alerts.keys() - ALERTS.keys():
         raise InvalidSnapshot("unsupported_field")
+    if payload["schema_version"] == 1 and fields.keys() & LIFECYCLE_FIELDS:
+        raise InvalidSnapshot("unsupported_field")
     for key, field in fields.items():
         if field is None:
             continue
-        if FIELDS[key][2] == "text":
+        if FIELDS[key][2] == "boolean":
+            if type(field) is not bool:
+                raise InvalidSnapshot("invalid_boolean")
+        elif FIELDS[key][2] == "timestamp":
+            if not _integer(field, maximum=32503680000000):
+                raise InvalidSnapshot("invalid_timestamp")
+        elif FIELDS[key][2] == "text":
             if not isinstance(field, str) or len(field) > 128:
                 raise InvalidSnapshot("invalid_text")
         elif (
@@ -63,7 +71,7 @@ def validate_snapshot(payload: object, now_ms: int) -> dict:
         raise InvalidSnapshot("invalid_alert")
     return deepcopy(
         {
-            "schema_version": 1,
+            "schema_version": payload["schema_version"],
             "source_id": source,
             "sequence": payload["sequence"],
             "sent_at_ms": sent,
@@ -89,3 +97,37 @@ def classify_snapshot(current: dict | None, incoming: dict) -> str:
     if incoming["glucose"]["time_ms"] < current["glucose"]["time_ms"]:
         raise InvalidSnapshot("older_glucose")
     return "accepted"
+
+
+def validate_history(payload, now_ms):
+    """History cannot carry live fields or alert state."""
+    if (
+        not isinstance(payload, dict)
+        or type(payload.get("schema_version")) is not int
+        or payload["schema_version"] != 2
+    ):
+        raise InvalidSnapshot("unsupported_version")
+    if (
+        set(payload) != {"schema_version", "type", "source_id", "batch_id", "readings"}
+        or payload["type"] != "history"
+    ):
+        raise InvalidSnapshot("invalid_history")
+    for key in ("source_id", "batch_id"):
+        if not isinstance(payload[key], str) or not re.fullmatch(
+            r"[A-Za-z0-9_-]{1,64}", payload[key]
+        ):
+            raise InvalidSnapshot("invalid_history_identifier")
+    readings = payload["readings"]
+    if not isinstance(readings, list) or not 1 <= len(readings) <= MAX_HISTORY_BATCH:
+        raise InvalidSnapshot("invalid_history_size")
+    previous = 0
+    for point in readings:
+        if not isinstance(point, dict) or set(point) != {"time_ms", "mgdl"}:
+            raise InvalidSnapshot("invalid_history_point")
+        stamp, value = point["time_ms"], point["mgdl"]
+        if not _integer(stamp) or not previous < stamp <= now_ms + 120000:
+            raise InvalidSnapshot("invalid_history_timestamp")
+        if type(value) not in (int, float) or not 0 < value <= 1000 or not math.isfinite(value):
+            raise InvalidSnapshot("invalid_glucose")
+        previous = stamp
+    return deepcopy(payload)

@@ -11,6 +11,14 @@ from .const import DOMAIN, MAX_BODY_BYTES
 from .coordinator import JugglucoCoordinator
 from .protocol import InvalidSnapshot
 
+
+async def async_setup(hass, config):
+    from .api import async_register
+
+    await async_register(hass)
+    return True
+
+
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 
@@ -56,7 +64,7 @@ async def _reload(hass, entry):
 
 async def async_unload_entry(hass, entry):
     if await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        webhook.async_unregister(hass, entry.data["webhook_id"])
+        webhook.async_unregister(hass, entry.runtime_data.webhook_id)
         return True
     return False
 
