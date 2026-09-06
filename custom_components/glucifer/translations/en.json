@@ -11,11 +11,12 @@
       },
       "receiver": {
         "title": "Connect JugglucoNG",
-        "description": "Save this receiver, then paste the following URL into a Glucifer HA API destination in JugglucoNG:\n\n`{url}`\n\nIf only a path is shown, prefix it with your Home Assistant URL. Keep the full URL private. Remote access requires a reachable HTTPS endpoint or VPN and local-only reception turned off.\n\nScan in JugglucoNG or copy the URL above:\n\n<ha-qr-code data=\"{qr}\" width=\"240\"></ha-qr-code>",
+        "description": "Save this receiver, then paste the following URL into a Glucifer HA API destination in JugglucoNG:\n\n`{url}`\n\nIf only a path is shown, prefix it with your Home Assistant URL. Keep the full URL private. Remote access requires a reachable HTTPS endpoint or VPN and local-only reception turned off.\n\nScan in JugglucoNG or copy the URL above:",
         "data": {
           "local_only": "Accept local requests only",
           "stale_seconds": "Mark data unavailable after (seconds)",
-          "glucose_unit": "Glucose display unit"
+          "glucose_unit": "Glucose display unit",
+          "qr_code": "Receiver QR code"
         }
       }
     },
@@ -27,17 +28,21 @@
     "step": {
       "init": {
         "title": "Receiver settings",
-        "description": "Receiver URL (keep private):\n\n`{url}`\n\nIf only a path is shown, prefix it with your Home Assistant URL. Field selection is configured in the JugglucoNG sender. Removing this integration revokes its URL.\n\nScan in JugglucoNG or copy the URL above:\n\n<ha-qr-code data=\"{qr}\" width=\"240\"></ha-qr-code>",
+        "description": "Receiver URL (keep private):\n\n`{url}`\n\nIf only a path is shown, prefix it with your Home Assistant URL. Field selection is configured in the JugglucoNG sender. Removing this integration revokes its URL.\n\nScan in JugglucoNG or copy the URL above:",
         "data": {
           "local_only": "Accept local requests only",
           "stale_seconds": "Mark data unavailable after (seconds)",
           "glucose_unit": "Glucose display unit",
-          "rotate_secret": "Replace the receiver secret"
+          "rotate_secret": "Replace the receiver secret",
+          "qr_code": "Receiver QR code"
         }
       },
       "rotate": {
         "title": "Replace receiver URL",
-        "description": "Save this new URL, then submit to revoke the old URL. Update the existing JugglucoNG destination after submitting. Entities and stored readings are preserved.\n\n`{url}`\n\n<ha-qr-code data=\"{qr}\" width=\"240\"></ha-qr-code>"
+        "description": "Save this new URL, then submit to revoke the old URL. Update the existing JugglucoNG destination after submitting. Entities and stored readings are preserved.\n\n`{url}`",
+        "data": {
+          "qr_code": "Receiver QR code"
+        }
       }
     }
   }

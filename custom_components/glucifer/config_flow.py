@@ -1,13 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Create a private receiver endpoint for each sender."""
 
-from html import escape
-
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components import webhook
 from homeassistant.core import callback
 from homeassistant.helpers.network import NoURLAvailableError
+from homeassistant.helpers.selector import QrCodeSelector
 
 from .const import DEFAULT_STALE_SECONDS, DOMAIN
 
@@ -19,10 +18,11 @@ def endpoint(hass, webhook_id):
         return webhook.async_generate_path(webhook_id)
 
 
-def schema(options=None):
+def schema(options=None, url=None):
     options = options or {}
     return vol.Schema(
         {
+            **qr_schema(url),
             vol.Required("glucose_unit", default=options.get("glucose_unit", "mg/dL")): vol.In(
                 ["mg/dL", "mmol/L"]
             ),
@@ -66,11 +66,11 @@ class JugglucoFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title=self._name,
                 data={"webhook_id": self._webhook_id},
-                options=user_input,
+                options={key: value for key, value in user_input.items() if key != "qr_code"},
             )
         return self.async_show_form(
             step_id="receiver",
-            data_schema=schema(),
+            data_schema=schema(url=endpoint(self.hass, self._webhook_id)),
             description_placeholders=placeholders(self.hass, self._webhook_id),
         )
 
@@ -84,7 +84,9 @@ class JugglucoOptions(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         if user_input is not None:
             self._options = {
-                key: value for key, value in user_input.items() if key != "rotate_secret"
+                key: value
+                for key, value in user_input.items()
+                if key not in {"rotate_secret", "qr_code"}
             }
             if user_input.get("rotate_secret"):
                 self._new_webhook_id = webhook.async_generate_id()
@@ -92,9 +94,9 @@ class JugglucoOptions(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self._options)
         return self.async_show_form(
             step_id="init",
-            data_schema=schema(self.config_entry.options).extend(
-                {vol.Optional("rotate_secret", default=False): bool}
-            ),
+            data_schema=schema(
+                self.config_entry.options, endpoint(self.hass, self.config_entry.data["webhook_id"])
+            ).extend({vol.Optional("rotate_secret", default=False): bool}),
             description_placeholders=placeholders(self.hass, self.config_entry.data["webhook_id"]),
         )
 
@@ -107,11 +109,15 @@ class JugglucoOptions(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self._options)
         return self.async_show_form(
             step_id="rotate",
-            data_schema=vol.Schema({}),
+            data_schema=vol.Schema(qr_schema(endpoint(self.hass, self._new_webhook_id))),
             description_placeholders=placeholders(self.hass, self._new_webhook_id),
         )
 
 
 def placeholders(hass, webhook_id):
     url = endpoint(hass, webhook_id)
-    return {"url": url, "qr": escape(url, quote=True)}
+    return {"url": url}
+
+
+def qr_schema(url):
+    return {vol.Optional("qr_code"): QrCodeSelector({"data": url, "scale": 5})} if url else {}

@@ -122,13 +122,22 @@ async def test_config_flow(hass):
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"name": "Phone"})
     assert result["step_id"] == "receiver"
     assert "/api/webhook/" in result["description_placeholders"]["url"]
+    from homeassistant.helpers.selector import QrCodeSelector
+
+    qr = next(
+        value
+        for value in result["data_schema"].schema.values()
+        if isinstance(value, QrCodeSelector)
+    )
+    assert qr.config["data"] == result["description_placeholders"]["url"]
     with patch("custom_components.glucifer.async_setup_entry", new=AsyncMock(return_value=True)):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"local_only": True, "stale_seconds": 300}
+            result["flow_id"], {"local_only": True, "stale_seconds": 300, "qr_code": None}
         )
         await hass.async_block_till_done()
     assert result["type"] == "create_entry"
     assert len(result["data"]["webhook_id"]) == 64
+    assert "qr_code" not in result["options"]
 
 
 async def test_receiver_entries_are_isolated(hass, receiver, snapshot):

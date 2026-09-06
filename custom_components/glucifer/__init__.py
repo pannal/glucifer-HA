@@ -6,6 +6,7 @@ import json
 from aiohttp import web
 from homeassistant.components import webhook
 from homeassistant.const import Platform
+from homeassistant.helpers import config_validation as cv
 
 from .const import DOMAIN, MAX_BODY_BYTES
 from .coordinator import JugglucoCoordinator
@@ -19,6 +20,7 @@ async def async_setup(hass, config):
     return True
 
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 
