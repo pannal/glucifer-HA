@@ -1,6 +1,6 @@
 # Glucifer for Home Assistant
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png" alt="Glucifer HA: horned glucose drop, chart, and insulin pen beside the Home Assistant icon and Glucifer HA lettering" width="100%">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/e6475a0ff13b750936a37f4d0ea238efa1d1c5c3/docs/brand/banner.png" alt="Glucifer HA: horned glucose drop, chart, and insulin pen beside the Home Assistant icon and Glucifer HA lettering" width="100%">
 
 Bring [JugglucoNG](https://github.com/ctqvva/JugglucoNG) glucose readings into
 Home Assistant through a private webhook. Includes mg/dL and mmol/L,
@@ -19,22 +19,28 @@ yet. Live phone-to-Home-Assistant testing is still pending.
 
 ## Quick setup
 
+Pair with a QR code from Home Assistant. Have HA open on a computer or another
+screen so your phone can scan it. Use the matching JugglucoNG build noted above.
+
 1. In **HACS > Custom repositories**, add
    `https://github.com/pannal/glucifer-ha` as an **Integration**. Enable
    pre-release versions, download Glucifer HA, and restart Home Assistant.
-2. Open **Settings > Devices & services > Add integration > Glucifer HA**.
+2. In HA, open **Settings > Devices & services > Add integration > Glucifer HA**.
    Name the phone, choose your glucose unit, and finish receiver setup.
-3. In JugglucoNG's **API destinations**, add a **Glucifer HA** destination.
-   Scan the receiver's QR code from Home Assistant's integration options,
-   confirm the host, or paste the full receiver URL.
-4. Choose what to send. Glucose and measurement time are always enabled;
+3. **Display the QR code:** open that receiver's integration options in HA.
+   Leave the QR code visible on screen.
+4. **Scan it in JugglucoNG:** open **API destinations**, add a **Glucifer HA**
+   destination, and tap **Scan QR Code**. Scan the code, confirm the Home
+   Assistant host, then enable and save the destination.
+5. Choose what to send. Glucose and measurement time are always enabled;
    trend, delta, and alerts start enabled. Other fields and history backfill
    start disabled.
-5. Send a test snapshot. Check that Home Assistant shows the glucose value
-   and measurement time.
+6. Tap **Send test message** in JugglucoNG. Check that HA shows the glucose
+   value and measurement time.
 
-The phone must be able to reach Home Assistant. If setup shows only
-`/api/webhook/...`, prepend your Home Assistant URL and enter it manually.
+The phone must be able to reach Home Assistant. If you cannot scan the code,
+paste the complete receiver URL into the destination instead. If HA shows only
+`/api/webhook/...`, prepend your Home Assistant URL and use manual entry.
 Keep the receiver URL and QR code private: they contain the receiver secret.
 
 ## Screenshots
