@@ -121,6 +121,7 @@ async def test_config_flow(hass):
     assert result["step_id"] == "user"
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"name": "Phone"})
     assert result["step_id"] == "receiver"
+    assert result["data_schema"]({})["local_only"] is False
     assert "/api/webhook/" in result["description_placeholders"]["url"]
     from homeassistant.helpers.selector import QrCodeSelector
 
@@ -138,6 +139,7 @@ async def test_config_flow(hass):
     assert result["type"] == "create_entry"
     assert len(result["data"]["webhook_id"]) == 64
     assert "qr_code" not in result["options"]
+    assert result["options"]["local_only"] is True  # Explicit local-only choice is retained.
 
 
 async def test_receiver_entries_are_isolated(hass, receiver, snapshot):

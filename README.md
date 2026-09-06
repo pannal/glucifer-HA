@@ -38,7 +38,8 @@ screen so your phone can scan it. Use the matching JugglucoNG build noted above.
 6. Tap **Send test message** in JugglucoNG. Check that HA shows the glucose
    value and measurement time.
 
-The phone must be able to reach Home Assistant. If you cannot scan the code,
+The phone must be able to reach Home Assistant. **Accept local requests only**
+starts off for new receivers. If you cannot scan the code,
 paste the complete receiver URL into the destination instead. If HA shows only
 `/api/webhook/...`, prepend your Home Assistant URL and use manual entry.
 Keep the receiver URL and QR code private: they contain the receiver secret.

@@ -26,7 +26,7 @@ def schema(options=None, url=None):
             vol.Required("glucose_unit", default=options.get("glucose_unit", "mg/dL")): vol.In(
                 ["mg/dL", "mmol/L"]
             ),
-            vol.Required("local_only", default=options.get("local_only", True)): bool,
+            vol.Required("local_only", default=options.get("local_only", False)): bool,
             vol.Required(
                 "stale_seconds", default=options.get("stale_seconds", DEFAULT_STALE_SECONDS)
             ): vol.All(vol.Coerce(int), vol.Range(min=60, max=3600)),

@@ -267,9 +267,9 @@ receiver deletes its Glucifer history. Recorder retention is separate.
 
 ## Access away from home
 
-Local reception is enabled by default. For remote reception, use an HTTPS
-Home Assistant endpoint or a VPN and configure **Accept local requests
-only** accordingly. A LAN URL will stop working when the phone leaves that
+**Accept local requests only** is off by default for new receivers. Existing
+receivers keep their saved setting. For remote reception, use a reachable HTTPS
+Home Assistant endpoint or a VPN. A LAN URL will stop working when the phone leaves that
 network unless the VPN provides a route back to it.
 
 This integration does not provide Clone pairing, ICE/TURN connectivity,
