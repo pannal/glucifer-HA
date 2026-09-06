@@ -222,9 +222,11 @@ are unavailable are omitted. Existing `show_details: false` and
 
 The main value defaults to left alignment, with the trend arrow on the right.
 Under **Display**, **Glucose font size (px)** accepts 24 to 96 pixels (default 42),
-and **Glucose alignment** offers left or center. **Arrow size (px)** accepts
+and **Glucose alignment** offers left or centered across the whole card. **Arrow size (px)** accepts
 24 to 160 pixels (default 84). Both scale down on narrow cards. All single
 arrows use the same centered SVG shape, rotated for their direction.
+**Arrow position** keeps the arrow at the right edge, either beside glucose
+(the default) or lower beside the delta and IOB lines.
 **Show logo**, enabled by default, displays the transparent Glucifer mark at the
 right of the title. **Show glucose unit**, also enabled by default, controls
 the unit beside the main value.
@@ -240,11 +242,13 @@ before display.
 The card reuses HA's native chart component with Glucifer's stored readings.
 Hover to inspect values, hold Ctrl (Command on Mac) while scrolling to zoom,
 drag to pan, and use HA's reset control to restore the full window. Touch
-screens support pinch zoom. Journal markers remain selectable while zoomed. Click an entry again to close
+screens support pinch zoom. Journal pills remain selectable while zoomed. Click an entry again to close
 its details. Hovering journal markers or chips suppresses the glucose tooltip.
-Colored chips show insulin units, carbohydrate grams, or the note label, with connector lines to their
-points. Nearby chips are staggered; crowded labels are hidden when they cannot
-fit, while their points remain available. Zoom in to see more labels.
+Colored pills show insulin units, carbohydrate grams, or the note label, with
+connector lines to their glucose anchors. Nearby pills are staggered; crowded
+labels are hidden when they cannot fit. Zoom in to see more labels.
+**Show chart marker symbols and legend** optionally adds clickable triangles,
+circles and squares at the anchors, plus their legend. Both are hidden by default.
 If HA's chart module cannot load, a basic chart remains available.
 
 Under **Journal**, **Compact journal list** is enabled by default. Turn it off

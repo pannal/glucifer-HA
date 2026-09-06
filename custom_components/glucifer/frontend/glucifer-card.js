@@ -11,9 +11,9 @@ const GLUCIFER_FIELDS = {
 const GLUCIFER_SENSOR_FIELDS = Object.keys(GLUCIFER_FIELDS).filter(key => key.startsWith("sensor_"));
 const GLUCIFER_DEFAULTS = {
   ...Object.fromEntries(Object.keys(GLUCIFER_FIELDS).map(key => [`show_${key}`, true])),
-  show_reading_age: true, show_glucose_unit: true, show_logo: true, arrow_size: 84, glucose_size: 42, glucose_alignment: "left", show_eiob_u: false,
+  show_reading_age: true, show_glucose_unit: true, show_logo: true, arrow_size: 84, arrow_position: "glucose", glucose_size: 42, glucose_alignment: "left", show_eiob_u: false,
   hours: 24, show_history: true, show_details: true, show_alerts: true, show_lifecycle: true,
-  show_journal: false, journal_compact: true, show_journal_markers: true, journal_days: 7, journal_limit: 25,
+  show_journal: false, journal_compact: true, show_journal_markers: true, show_journal_symbols: false, journal_days: 7, journal_limit: 25,
   journal_types: ["insulin", "carbs", "note"], color_glucose: true, color_trend: true,
   very_low: 54, low: 70, high: 180, very_high: 250,
   glucose_very_low_color: [183,28,28], glucose_low_color: [229,57,53],
@@ -29,6 +29,7 @@ function gluciferConfig(config) {
     if (!Number.isFinite(value) || value < min || value > max) throw new Error(`${key.replaceAll("_", " ")} must be between ${min} and ${max}.`);
     result[key] = value;
   }
+  if (!["glucose", "details"].includes(result.arrow_position)) throw new Error("Choose an arrow position beside glucose or details.");
   if (!["left", "center"].includes(result.glucose_alignment)) throw new Error("Choose left or center glucose alignment.");
   if (!(result.very_low < result.low && result.low < result.high && result.high < result.very_high))
     throw new Error("Glucose boundaries must increase from very low to very high.");
@@ -68,10 +69,11 @@ function gluciferForm() {
     schema: [field("entity","Glucose entity",{entity:{filter:{domain:"sensor",device_class:"blood_glucose_concentration"}}}),
       field("title","Title",{text:{}}), number("hours","Chart hours",1,168),
       panel("display","Display",[{...number("glucose_size","Glucose font size (px)",24,96),default:42},
-        {...field("glucose_alignment","Glucose alignment",{select:{options:[{value:"left",label:"Left"},{value:"center",label:"Center"}]}}),default:"left"},{...number("arrow_size","Arrow size (px)",24,160),default:84},toggle("show_logo","Show logo"),toggle("show_history","Glucose chart"),toggle("show_glucose_unit","Show glucose unit"),toggle("show_reading_age","Reading age"),toggle("show_alerts","Active alerts")]),
+        {...field("glucose_alignment","Glucose alignment",{select:{options:[{value:"left",label:"Left"},{value:"center",label:"Center"}]}}),default:"left"},{...number("arrow_size","Arrow size (px)",24,160),default:84},
+        {...field("arrow_position","Arrow position",{select:{options:[{value:"glucose",label:"Beside glucose"},{value:"details",label:"Lower, beside delta and IOB"}]}}),default:"glucose"},toggle("show_logo","Show logo"),toggle("show_history","Glucose chart"),toggle("show_glucose_unit","Show glucose unit"),toggle("show_reading_age","Reading age"),toggle("show_alerts","Active alerts")]),
       panel("values","Glucose and phone data",Object.entries(GLUCIFER_FIELDS).filter(([key]) => !key.startsWith("sensor_")).map(([key,label]) => toggle(`show_${key}`,label))),
       panel("sensor","Sensor data",GLUCIFER_SENSOR_FIELDS.map(key => toggle(`show_${key}`,GLUCIFER_FIELDS[key]))),
-      panel("journal","Journal",[toggle("show_journal_markers","Show journal points on chart"),toggle("show_journal","Show journal history list"),toggle("journal_compact","Compact journal list"),
+      panel("journal","Journal",[toggle("show_journal_markers","Show journal pills on chart"),toggle("show_journal_symbols","Show chart marker symbols and legend"),toggle("show_journal","Show journal history list"),toggle("journal_compact","Compact journal list"),
         number("journal_days","Journal history days",1,90),number("journal_limit","Maximum entries in the list",1,200),
         field("journal_types","Journal entry types",{select:{multiple:true,options:[{value:"insulin",label:"Insulin"},{value:"carbs",label:"Carbohydrates"},{value:"note",label:"Notes"}]}})]),
       panel("glucose_colors","Glucose value colors",[toggle("color_glucose","Color glucose by range"),
@@ -86,6 +88,7 @@ function gluciferForm() {
       if (schema.name === "journal_limit") return "Default 25 entries, newest first.";
       if (schema.name === "glucose_size") return "Default 42 px. Large values scale down to fit narrow cards.";
       if (schema.name === "show_eiob_u") return "Show Active insulin (eIOB) beside IOB. Enable this field in JugglucoNG too.";
+      if (schema.name === "arrow_position") return "Keep the arrow on the right, beside the glucose value or lower beside the delta and IOB lines.";
       if (schema.name === "arrow_size") return "Default 84 px. The arrow scales down on narrow cards to leave room for the glucose value.";
       if (schema.name === "hours") return "Default 24 hours. Glucose history is retained for up to 7 days.";
       if (schema.name?.startsWith("show_") && GLUCIFER_FIELDS[schema.name.slice(5)]) return "Display this field when enabled in JugglucoNG and available in Home Assistant. This does not change what the phone sends.";
@@ -231,7 +234,11 @@ class GluciferCard extends HTMLElement {
     if (!this.shadowRoot.hasChildNodes()) this.shadowRoot.innerHTML = `<style>
       ha-card {display:block;padding:20px;container-type:inline-size} .title-row {display:flex;align-items:center;gap:12px;margin-bottom:12px} h2 {margin:0;font-size:20px;flex:1;min-width:0} .brand-logo {width:32px;height:32px;object-fit:contain;flex:none} .reading {display:flex;align-items:center;justify-content:space-between;gap:12px}
       .glucose,.trend {font-size:42px;font-weight:600} .trend {white-space:nowrap;flex:none;font-size:min(var(--glucifer-arrow-size,84px),26cqw);line-height:1;margin-left:auto;width:1em;height:1em;display:flex;align-items:center;justify-content:center} .glucose {min-width:0;flex:1;font-size:min(var(--glucifer-glucose-size,42px),14cqw)}
+      .details-row {display:flex;align-items:center;gap:12px} .details-copy {flex:1;min-width:0;overflow-wrap:anywhere}
       .detail {color:var(--secondary-text-color);margin:8px 0} .warning {color:var(--warning-color)}
+      .reading.centered {display:grid;gap:0;grid-template-columns:var(--glucifer-trend-space,0px) minmax(0,1fr) var(--glucifer-trend-space,0px)}
+      .reading.centered.has-trend {--glucifer-trend-space:calc(min(var(--glucifer-arrow-size,84px),26cqw) + 12px)}
+      .reading.centered .glucose {grid-area:1 / 2;overflow-wrap:anywhere} .reading.centered .trend {grid-area:1 / 3;justify-self:end}
       .trend svg {display:block;width:100%;height:100%;overflow:visible} .trend path {fill:none;stroke:currentColor;stroke-width:7;stroke-linecap:round;stroke-linejoin:round}
       .trend-label {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
       .history-chart {width:100%;height:180px;overflow:visible} .history-chart path {fill:none;stroke:var(--primary-color);stroke-width:2}
@@ -247,7 +254,7 @@ class GluciferCard extends HTMLElement {
       .journal-section.compact .journal-list button {border:0;border-radius:0;padding:4px 0;min-height:28px;font-size:14px;line-height:20px}
       .journal-selection {padding:12px;border:1px solid var(--divider-color);border-radius:8px;white-space:pre-wrap}
       [hidden] {display:none!important}
-    </style><ha-card><div class="title-row"><h2></h2><img class="brand-logo" alt="Glucifer" width="32" height="32"></div><div class="reading"><div class="glucose"></div><span class="trend"></span></div><div class="detail summary"><span class="delta"></span><span class="reading-age"></span></div><div class="detail optional-values"></div>
+    </style><ha-card><div class="title-row"><h2></h2><img class="brand-logo" alt="Glucifer" width="32" height="32"></div><div class="reading"><div class="glucose"></div><span class="trend"></span></div><div class="details-row"><div class="details-copy"><div class="detail summary"><span class="delta"></span><span class="reading-age"></span></div><div class="detail optional-values"></div></div></div>
       <div class="warning health"></div><div class="native-chart" hidden></div><svg class="history-chart" viewBox="0 0 600 180" role="img" aria-label="Glucose history"><path></path><g class="journal-markers"></g></svg>
       <div class="axis"><span class="start"></span><span class="range"></span><span class="end"></span></div>
       <div class="detail journal-legend" hidden>▲ Insulin · ● Carbohydrates · ■ Note</div><div class="detail history"></div><div class="journal-selection" hidden><div class="selection-label"></div><div class="selection-note"></div><button>Close</button></div><details class="journal-section" hidden><summary>Journal<span class="journal-summary-count"></span></summary><div class="journal-count detail"></div><div class="journal-list"></div></details><ul></ul><div class="detail lifecycle"></div><button>More details</button></ha-card>`;
@@ -289,7 +296,12 @@ class GluciferCard extends HTMLElement {
     root.querySelector(".glucose").style.color = gluciferGlucoseColor(value, unit, this.config);
     root.querySelector(".trend").style.color = gluciferTrendColor(Number.isFinite(value) ? trend : null, this.config);
     root.querySelector(".trend").hidden = !this.config.show_trend;
-    root.querySelector(".trend").style.setProperty("--glucifer-arrow-size", `${this.config.arrow_size}px`);
+    const reading = root.querySelector(".reading");
+    reading.classList.toggle("centered", this.config.glucose_alignment === "center");
+    const arrowHost = this.config.arrow_position === "details" ? root.querySelector(".details-row") : reading;
+    if (arrow.parentElement !== arrowHost) arrowHost.append(arrow);
+    reading.classList.toggle("has-trend", this.config.arrow_position === "glucose" && this.config.show_trend && Number.isFinite(value) && Boolean(trendArrow));
+    root.querySelector("ha-card").style.setProperty("--glucifer-arrow-size", `${this.config.arrow_size}px`);
     root.querySelector(".summary").hidden = !this.config.show_delta_mgdl && !this.config.show_reading_age;
     root.querySelector("ul").hidden = !this.config.show_alerts;
     const delta = state("delta_mgdl");
@@ -355,6 +367,7 @@ class GluciferCard extends HTMLElement {
     root.querySelector(".journal-list").replaceChildren();
     if (this.config.show_journal_markers) {
       const group = root.querySelector(".journal-markers");
+      group.toggleAttribute("hidden", !this.config.show_journal_symbols);
       for (const entry of entries.filter(e => e.time_ms >= since)) {
         const x = (entry.time_ms - since) / (until - since) * 600;
         // Position at the closest measured glucose only within a 10-minute gap.
@@ -373,7 +386,7 @@ class GluciferCard extends HTMLElement {
         marker.onclick = () => select(entry); marker.onkeydown = event => { if (["Enter"," "].includes(event.key)) { event.preventDefault(); select(entry); } }; group.append(marker);
       }
     }
-    root.querySelector(".journal-legend").hidden = !this.config.show_history || !root.querySelector(".journal-marker");
+    root.querySelector(".journal-legend").hidden = !this.config.show_history || !this.config.show_journal_symbols || !root.querySelector(".journal-marker");
     const section = root.querySelector(".journal-section"); section.hidden = !this.config.show_journal;
     section.classList.toggle("compact", this.config.journal_compact);
     if (this.config.show_journal) {
@@ -439,7 +452,7 @@ class GluciferCard extends HTMLElement {
     this.chartElement.hass = this._hass;
     const entries = this.config.show_journal_markers ? this.journalEntries.filter(e => e.time_ms >= since) : [];
     const [chipBackground, chipText] = this.journalColors();
-    const signature = JSON.stringify([points, entries, unit, this.config.hours, this._hass.locale, this._hass.config?.time_zone, chipBackground, chipText]);
+    const signature = JSON.stringify([points, entries, unit, this.config.hours, this.config.show_journal_symbols, this._hass.locale, this._hass.config?.time_zone, chipBackground, chipText]);
     if (signature === this.chartSignature) return;
     this.chartSignature = signature;
     const data = [];
@@ -458,18 +471,19 @@ class GluciferCard extends HTMLElement {
     };
     for (const [kind,symbol,color] of [["insulin","triangle","#7e57c2"],["carbs","circle","#fb8c00"],["note","rect","#00838f"]]) {
       const icon = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="${icons[kind]}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`)}`;
-      series.push({id:kind, name:kind, type:"line", lineStyle:{opacity:0}, symbol, symbolSize:12, showSymbol:true, showAllSymbol:true, itemStyle:{color}, z:5, tooltip:{trigger:"item",show:false},
-        label:{show:true,position:"top",distance:18,backgroundColor:chipBackground,borderColor:`${color}55`,borderWidth:1,borderRadius:14,padding:[5,8],color:chipText,
+      series.push({id:kind, name:kind, type:"line", lineStyle:{opacity:0}, symbol, symbolSize:this.config.show_journal_symbols ? 12 : 0, showSymbol:true, showAllSymbol:true, itemStyle:{color}, z:5, tooltip:{trigger:"item",show:false},
+        // Keep the rich icon alignment stable when labels shift, so cached image bounds match the pill.
+        label:{show:true,position:"top",distance:24,verticalAlign:"middle",backgroundColor:chipBackground,borderColor:`${color}55`,borderWidth:1,borderRadius:14,padding:[5,8],color:chipText,
           rich:{icon:{width:14,height:14,backgroundColor:{image:icon}},value:{fontSize:12,color:chipText}},
           formatter:params => {
             const entry = entries.find(e => e.id === params.data.journalId);
             const value = entry?.amount != null ? `${new Intl.NumberFormat(this._hass?.locale?.language,{maximumFractionDigits:2}).format(entry.amount)} ${kind === "insulin" ? "U" : "g"}` : (entry?.label || "Note").slice(0,16);
             return `{icon| } {value|${value.replaceAll("{","（").replaceAll("}","）")}}`;
           }},
-        labelLine:{show:true,lineStyle:{color,opacity:0.35,width:1}},
+        labelLine:{show:true,lineStyle:{color,opacity:0.8,width:1.5}},
         labelLayout:params => ({moveOverlap:"shiftY",hideOverlap:true,
           x:Math.max(45+params.labelRect.width/2,Math.min(this.chartElement.clientWidth-15-params.labelRect.width/2,params.rect.x+params.rect.width/2)),
-          align:"center"}),
+          align:"center",verticalAlign:"middle"}),
         data:entries.filter(e => e.kind === kind).map(entry => {
           let left=0,right=points.length;
           while(left<right) { const middle=(left+right)>>>1; if(points[middle].time_ms<entry.time_ms) left=middle+1; else right=middle; }

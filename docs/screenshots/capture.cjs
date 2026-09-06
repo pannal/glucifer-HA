@@ -41,7 +41,8 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
       {dark:false, name:'dashboard-mgdl-interactive', config:{}},
       {dark:true, name:'dashboard-mmol-interactive', config:{}},
       {dark:true, name:'dashboard-centered-active-insulin', config:{glucose_size:64,glucose_alignment:'center',show_glucose_unit:false,show_eiob_u:true}},
-      {dark:false, name:'dashboard-expanded-journal', config:{glucose_size:48,arrow_size:64,journal_compact:false,show_logo:false}},
+      {dark:true, name:'dashboard-lower-arrow', config:{glucose_size:64,glucose_alignment:'center',show_glucose_unit:false,show_eiob_u:true,arrow_position:'details'}},
+      {dark:false, name:'dashboard-expanded-journal', config:{glucose_size:48,arrow_size:64,journal_compact:false,show_logo:false,show_journal_symbols:true}},
     ]) {
       await page.evaluate(({dark,config}) => {
         document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -95,7 +96,7 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
       });
     }
     if (errors.length) throw new Error(errors.join('\n'));
-    console.log('Captured four dashboard previews from the bundled card using synthetic data.');
+    console.log('Captured five dashboard previews from the bundled card using synthetic data.');
   } finally {
     await browser.close();
   }

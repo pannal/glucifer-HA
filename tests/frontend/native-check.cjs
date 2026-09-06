@@ -28,6 +28,12 @@ const {loadNativeChart} = require('./ha-native.cjs');
     const data=await page.evaluate(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().series);
     assert.equal(data[0].data.filter(point=>point[1]===null).length,1);
     assert.equal(data[2].data[0].journalId,'j1');
+    assert.equal(data[2].symbolSize,0);
+    assert.equal(await root.locator('.journal-legend').isVisible(),false);
+    // Enable optional symbols and retain the real canvas marker interaction checks.
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_journal_symbols=true;card.historySignature=null;card.render();});
+    await page.waitForFunction(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().series[2].symbolSize===12);
+    assert.equal(await root.locator('.journal-legend').isVisible(),true);
     // Click the actual ECharts canvas marker, not a synthetic chart-click event.
     const marker=await page.evaluate(()=>{
       const chart=document.querySelector('glucifer-card').chartElement;
@@ -116,6 +122,41 @@ const {loadNativeChart} = require('./ha-native.cjs');
     // HA's own reset control restores the full window.
     await root.locator('ha-chart-base .zoom-reset').click();
     await page.waitForFunction(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().dataZoom[0].start===0);
+    await page.evaluate(()=>{
+      const card=document.querySelector('glucifer-card');card.config.show_journal_symbols=false;
+      window.journal=[{id:'j2',kind:'carbs',amount:20,time_ms:Date.now()-5*60000,label:'Carbohydrates'},
+        {id:'j3',kind:'insulin',amount:2,time_ms:Date.now()-5*60000-30000,label:'Insulin'},
+        {id:'j4',kind:'note',time_ms:Date.now()-5*60000+30000,label:'Note'}];card.refresh(true);
+    });
+    await page.waitForFunction(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().series[2].data.length===1 && document.querySelector('glucifer-card').chartElement.chart.getOption().series[2].symbolSize===0);
+    assert.equal(await root.locator('.journal-legend').isVisible(),false);
+    const connectors=await page.evaluate(()=>{const chart=document.querySelector('glucifer-card').chartElement;return chart.data.slice(1).flatMap((s,i)=>s.data.map((d,j)=>{
+      const symbol=chart.chart.getModel().getSeriesByIndex(i+1).getData().getItemGraphicEl(j);let host=symbol;symbol.traverse?.(child=>{if(child.getTextContent?.())host=child;});
+      const label=host.getTextContent(),background=label._children.find(child=>child.type==='rect');
+      const bounds=background.getBoundingRect().clone();bounds.applyTransform(background.getComputedTransform());
+      const points=host.getTextGuideLine().shape.points,end=points.at(-1),pixel=chart.chart.convertToPixel({seriesIndex:i+1},d.value);
+      return {hidden:label.ignore,gap:Math.min(Math.abs(end[0]-bounds.x),Math.abs(end[0]-bounds.x-bounds.width),Math.abs(end[1]-bounds.y),Math.abs(end[1]-bounds.y-bounds.height)),anchorGap:Math.hypot(points[0][0]-pixel[0],points[0][1]-pixel[1])};
+    }));});
+    assert.ok(connectors.filter(c=>!c.hidden).length>=2,'Exercise labels moved to avoid overlap');
+    for(const connector of connectors.filter(c=>!c.hidden)) {assert.ok(connector.gap<1,'Moved pill connector reaches its painted edge');assert.ok(connector.anchorGap<1,'Connector starts at the glucose anchor');}
+    const pill=await page.evaluate(()=>{
+      const card=document.querySelector('glucifer-card'),chart=card.chartElement;
+      const symbol=chart.chart.getModel().getSeriesByIndex(2).getData().getItemGraphicEl(0);
+      let host=symbol;symbol.traverse?.(child=>{if(child.getTextContent?.())host=child;});
+      const label=host.getTextContent(),background=label._children.find(child=>child.type==='rect');
+      const bounds=background.getBoundingRect().clone();bounds.applyTransform(background.getComputedTransform());
+      const line=host.getTextGuideLine(),end=line.shape.points.at(-1);
+      const edgeDistance=Math.min(Math.abs(end[0]-bounds.x),Math.abs(end[0]-bounds.x-bounds.width),Math.abs(end[1]-bounds.y),Math.abs(end[1]-bounds.y-bounds.height));
+      const canvas=chart.shadowRoot.querySelector('canvas').getBoundingClientRect();
+      return {x:canvas.x+bounds.x+bounds.width/2,y:canvas.y+bounds.y+bounds.height/2,edgeDistance,opacity:line.style.opacity,width:line.style.lineWidth};
+    });
+    assert.ok(pill.edgeDistance<1,'Connector reaches the painted pill border');
+    assert.equal(pill.opacity,0.8);assert.equal(pill.width,1.5);
+    await page.mouse.click(pill.x,pill.y);
+    assert.equal(await root.locator('.journal-selection').isVisible(),true);
+    assert.match(await root.locator('.journal-selection').textContent(),/20 g/);
+    await page.mouse.click(pill.x,pill.y);
+    assert.equal(await root.locator('.journal-selection').isVisible(),false);
     assert.deepEqual(errors,[]);
     console.log('Native HA chart checks passed: real canvas chip toggle, journal hover isolation, delayed nested theme colors, tooltip, gaps, seconds-only updates, stable selection, edits/deletes, zoom preservation and reset.');
   } finally { await browser.close(); }

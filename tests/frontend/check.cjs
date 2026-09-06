@@ -89,6 +89,7 @@ const path = require('node:path');
   assert.equal(await root.locator('.trend').evaluate(el=>el.style.color),'rgb(251, 140, 0)');
   assert.equal(await root.locator('circle.journal-marker').getAttribute('cy'),'177');
   assert.equal(Math.round(Number(await root.locator('circle.journal-marker').getAttribute('cx'))),500);
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_journal_symbols=true;card.render();});
   await root.locator('circle.journal-marker').click();
   assert.match(await root.locator('.journal-selection').textContent(), /25 g/);
   assert.match(await root.locator('.journal-selection').textContent(), /<img src=x/);
@@ -242,8 +243,11 @@ const path = require('node:path');
   assert.equal(await root.locator('.glucose').textContent(),'139 mg/dL');
   // Size and logo controls retain the title/value layout, including double arrows.
   assert.equal(form.defaults.arrow_size,84);
+  assert.equal(form.defaults.arrow_position,'glucose');
+  assert.deepEqual(fields.find(field=>field.name==='arrow_position').selector.select.options.map(option=>option.value),['glucose','details']);
   assert.equal(form.defaults.show_logo,true);
   assert.equal(form.defaults.journal_compact,true);
+  assert.equal(form.defaults.show_journal_symbols,false);
   await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.brand-logo').naturalWidth>0);
   assert.equal(await root.locator('img').count(),1);
   await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_logo=false;card.render();});
@@ -271,6 +275,58 @@ const path = require('node:path');
   }
   await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.glucose_alignment='center';card.render();});
   assert.equal(await root.locator('.glucose').evaluate(el=>getComputedStyle(el).textAlign),'center');
+  // Center means the card's center, independent of the arrow's width or visibility.
+  for (const [width,size,arrow,unit,showUnit,showTrend] of [
+    [528,64,84,'mg/dL',false,true], [800,96,160,'mg/dL',true,true],
+    [280,96,160,'mg/dL',true,true], [280,96,160,'mmol/L',true,true],
+    [360,42,24,'mmol/L',false,true], [528,64,160,'mg/dL',false,false],
+  ]) {
+    await page.setViewportSize({width,height:1100});
+    await page.evaluate(({size,arrow,unit,showUnit,showTrend})=>{
+      const card=document.querySelector('glucifer-card');
+      Object.assign(card.config,{glucose_size:size,arrow_size:arrow,show_glucose_unit:showUnit,show_trend:showTrend});
+      window.fixture.states['sensor.phone_glucose']={state:unit==='mg/dL'?'135':'7.5',attributes:{unit_of_measurement:unit}};
+      card.render();
+    },{size,arrow,unit,showUnit,showTrend});
+    const boxes=await root.evaluate(card=>{
+      const root=card.shadowRoot,range=document.createRange();range.selectNodeContents(root.querySelector('.glucose'));
+      const text=range.getBoundingClientRect(),frame=root.querySelector('ha-card').getBoundingClientRect(),arrow=root.querySelector('.trend').getBoundingClientRect();
+      return {textCenter:text.x+text.width/2,cardCenter:frame.x+frame.width/2,textRight:text.right,arrowLeft:arrow.left,arrowRight:arrow.right,rowRight:root.querySelector('.reading').getBoundingClientRect().right};
+    });
+    assert.ok(Math.abs(boxes.textCenter-boxes.cardCenter)<1,`Value must be centered across the card at ${width}px`);
+    if(showTrend) {
+      assert.ok(boxes.textRight<=boxes.arrowLeft,'Centered text must not overlap the arrow');
+      assert.ok(Math.abs(boxes.arrowRight-boxes.rowRight)<1,'Arrow stays against the right edge');
+    }
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  }
+  await page.setViewportSize({width:800,height:900});
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_trend=true;card.render();});
+  // Moving the arrow lower preserves its horizontal position and size.
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');Object.assign(card.config,{arrow_size:84,glucose_size:64,show_glucose_unit:false});card.render();});
+  const topArrow=await root.locator('.trend').boundingBox();
+  for (const width of [800,528,280]) {
+    await page.setViewportSize({width,height:1100});
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.arrow_position='glucose';card.render();});
+    const original=await root.locator('.trend').boundingBox();
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.arrow_position='details';card.render();});
+    const lower=await root.locator('.trend').boundingBox(),reading=await root.locator('.reading').boundingBox();
+    assert.ok(Math.abs(lower.x-original.x)<1,'Lower arrow retains the same horizontal position');
+    assert.equal(lower.width,original.width);
+    assert.ok(lower.y>=reading.y+reading.height,'Lower arrow is below the glucose row');
+    const boxes=await root.evaluate(card=>{
+      const range=document.createRange();range.selectNodeContents(card.shadowRoot.querySelector('.glucose'));
+      const value=range.getBoundingClientRect(),frame=card.shadowRoot.querySelector('ha-card').getBoundingClientRect();
+      return {value:value.x+value.width/2,frame:frame.x+frame.width/2};
+    });
+    assert.ok(Math.abs(boxes.value-boxes.frame)<1);
+    assert.equal(await root.locator('.details-row .trend').count(),1);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  }
+  await page.setViewportSize({width:800,height:900});
+  await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.arrow_position='glucose';card.render();});
+  assert.equal(await root.locator('.reading .trend').count(),1);
+  assert.equal((await root.locator('.trend').boundingBox()).x,topArrow.x);
   const shapes=[];
   for(const [trend,angle] of [['Flat',0],['FortyFiveUp',-45],['SingleUp',-90],['FortyFiveDown',45],['SingleDown',90]]) {
     await page.evaluate(trend=>{window.fixture.states['sensor.phone_trend'].state=trend;document.querySelector('glucifer-card').hass=window.fixture;},trend);
