@@ -1,6 +1,6 @@
 # Glucifer HA
 
-<img src="docs/brand/banner.png" alt="Glucifer HA: a horned glucose drop with a chart line and insulin pen" width="100%">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png" alt="Glucifer HA: a horned glucose drop with a chart line and insulin pen" width="100%">
 
 Bring [JugglucoNG](https://github.com/ctqvva/JugglucoNG) glucose readings into
 Home Assistant through a private HTTP receiver. Includes mg/dL and mmol/L,
@@ -44,7 +44,7 @@ and dark themes. These are card previews, not captures from a live HA installati
 
 | mg/dL with history | mmol/L with stale data |
 | --- | --- |
-| <img src="docs/screenshots/dashboard-mgdl.png" alt="Glucifer card displaying 123 mg/dL and a six-hour history chart" width="400"> | <img src="docs/screenshots/dashboard-mmol-stale.png" alt="Glucifer card displaying unavailable glucose, a stale-data warning, and history in mmol/L" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl.png" alt="Glucifer card displaying 123 mg/dL and a six-hour history chart" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-stale.png" alt="Glucifer card displaying unavailable glucose, a stale-data warning, and history in mmol/L" width="400"> |
 
 ## Setup details
 
