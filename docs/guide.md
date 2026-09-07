@@ -532,7 +532,7 @@ retain their respective copyrights.
 
 ## Prediction curves
 
-Requires Glucifer **0.5.3+** and a JugglucoNG build with prediction export.
+Requires Glucifer **0.6.0+** and a JugglucoNG build with prediction export.
 In NG's Glucifer API destination, enable **Prediction** (**Prognose** in German).
 Keep NG's main prediction setting enabled. In the card editor, under **Display**,
 enable **Show prediction curves** (**Prognosekurven anzeigen**). Both export and

@@ -1,6 +1,6 @@
 # Glucifer for Home Assistant
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png?v=0.5.3" alt="Glucifer HA: horned glucose drop and insulin pen beside the Home Assistant icon and Glucifer HA lettering" width="100%">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png?v=0.6.0" alt="Glucifer HA: horned glucose drop and insulin pen beside the Home Assistant icon and Glucifer HA lettering" width="100%">
 
 Bring [JugglucoNG](https://github.com/ctqvva/JugglucoNG) glucose readings into
 Home Assistant through a private webhook. Includes mg/dL and mmol/L,
@@ -52,7 +52,7 @@ JugglucoNG build noted above.
    Pick the phone's glucose entity. The card registers automatically.
    **Optional predictions:** enable **Prediction** in NG's Glucifer destination,
    then **Display > Show prediction curves** in the card editor. Requires Glucifer
-   **0.5.3+** and the updated NG sender; both switches start off.
+   **0.6.0+** and the updated NG sender; both switches start off.
 
 The phone must be able to reach Home Assistant. **Accept local requests only**
 starts off for new connections. If HA shows only `/api/webhook/...`, prepend
@@ -66,34 +66,34 @@ and dark themes. These are card previews, not captures from a live HA installati
 
 | mg/dL with journal markers and history | mmol/L with journal markers and history |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png?v=0.5.3" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png?v=0.5.3" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png?v=0.6.0" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png?v=0.6.0" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
 
 <details>
 <summary><strong>More card layouts</strong></summary>
 
 | Centered value, hidden unit and active insulin | Expanded journal, optional markers and hidden logo |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-centered-active-insulin.png?v=0.5.3" alt="Dark card with a centered 6.8 glucose value and Insulin on board: 5.2 U (Active: 1.7 U)" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-expanded-journal.png?v=0.5.3" alt="Light card with a larger 123 mg/dL value, optional chart markers and padded journal rows" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-centered-active-insulin.png?v=0.6.0" alt="Dark card with a centered 6.8 glucose value and Insulin on board: 5.2 U (Active: 1.7 U)" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-expanded-journal.png?v=0.6.0" alt="Light card with a larger 123 mg/dL value, optional chart markers and padded journal rows" width="400"> |
 
 **Arrow position: lower, beside delta and IOB** keeps the arrow on the right
 while giving the glucose value its own row.
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-lower-arrow.png?v=0.5.3" alt="Centered glucose above the delta and active insulin details, with the trend arrow at the right of the details" width="400">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-lower-arrow.png?v=0.6.0" alt="Centered glucose above the delta and active insulin details, with the trend arrow at the right of the details" width="400">
 
 **Optional predictions**: dashed NG projection curves extend into the future.
 Enable prediction export in NG and **Show prediction curves** in the card editor.
 Both are off by default. [Setup and behavior](docs/guide.md#prediction-curves)
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-predictions.png?v=0.5.3" alt="Glucose card with optional dashed raw and auto prediction curves extending beyond the measured history" width="400">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-predictions.png?v=0.6.0" alt="Glucose card with optional dashed raw and auto prediction curves extending beyond the measured history" width="400">
 
 **Typography and locale**: an italic Georgia value, a longer, thinner arrow,
 and German labels, dates and numbers, including `E` for insulin units. Fonts come from the browser.
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-typography-locale.png?v=0.5.3" alt="Dark card showing a large italic 6,8 glucose value, a longer thin arrow beside details, and German labels with E for insulin units" width="400">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-typography-locale.png?v=0.6.0" alt="Dark card showing a large italic 6,8 glucose value, a longer thin arrow beside details, and German labels with E for insulin units" width="400">
 
 **Inline journal details**: selecting a row expands it directly in the list.
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-inline-journal.png?v=0.5.3" alt="German Glucifer card with a Notiz entry expanded in place in the Tagebuch list" width="400">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-inline-journal.png?v=0.6.0" alt="German Glucifer card with a Notiz entry expanded in place in the Tagebuch list" width="400">
 
 These options are available in the card's visual editor.
 

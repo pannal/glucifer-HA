@@ -185,7 +185,7 @@ resubscribe once the entry is available again. Neither command exposes the
 webhook secret or source identifier.
 
 
-## Prediction curves (Glucifer 0.5.3+)
+## Prediction curves (Glucifer 0.6.0+)
 
 Live snapshots in either schema version may include a top-level `predictions`
 array. It replaces the preceding curves; omission or `[]` clears them. Older
