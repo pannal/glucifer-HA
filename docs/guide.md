@@ -139,15 +139,25 @@ automation references survive re-enabling the field.
 
 Alerts are **binary sensors**, with a boolean value in the payload. The
 integration does not recalculate glucose thresholds or run a second alert
-engine. It reflects the alert episode reported by JugglucoNG.
+engine. It follows the alert state reported by JugglucoNG.
 
-- `on`: JugglucoNG reports an active alert episode.
-- `off`: JugglucoNG explicitly reports that no episode is active.
-- `unavailable`: the field is disabled, unknown, or stale.
+- `on`: a production alert fired and is awaiting acknowledgement.
+- `off`: the alert was acknowledged, snoozed, or cleared by NG's runtime.
+- `unavailable`: the field is disabled, unknown, or stale. This is not an acknowledgement.
 
-An acknowledgement or silenced sound does not necessarily end an alert
-episode. The sender reports the episode until its runtime clears it. Manual
-alarm tests are not production episodes.
+With the updated NG sender, Stop/dismiss requests a live `off` push without
+waiting for another glucose reading. Phone and watch snooze actions also clear
+the exported state. A later actual firing sends `on` again. This lets an HA
+automation start lights or sound on `on` and stop them when you acknowledge the
+alert on your phone. The live-event option bypasses the background interval by
+default; delivery still needs a working connection.
+
+NG keeps its internal episode suppression after dismissal, so acknowledgement
+does not immediately re-arm the same alert. Manual alarm tests do not change
+production alert values. Older NG builds can leave the value `on` after
+Stop/dismiss; install the sender acknowledgement fix from
+[NG PR #275](https://github.com/ctqvva/JugglucoNG/pull/275). No HA update is needed
+for this sender change.
 
 Supported fields cover low, very low, high, very high, forecast low, forecast
 high, missed reading, persistent high, signal loss, sensor expiry, falling
