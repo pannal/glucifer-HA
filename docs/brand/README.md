@@ -1,6 +1,6 @@
 # Brand assets
 
-Edit `glucifer.svg` to change the horned drop and insulin pen. It is the vector master for the standalone card mark, framed app icons and README banner. The card serves the transparent `custom_components/glucifer/brand/mark.svg` directly.
+Edit `glucifer.svg` to change the horned drop and insulin pen. It is the vector master for the standalone card mark, framed app icons and README banner. The master frame is centered on the blood drop, with symmetric horn spacing. The pen does not affect that anchor. The card serves the transparent `custom_components/glucifer/brand/mark.svg` directly.
 
 After installing the repository's npm dependencies and Playwright Chromium, regenerate all variants:
 

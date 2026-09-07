@@ -9,6 +9,7 @@ const body = svg => svg.slice(svg.indexOf('>') + 1, svg.lastIndexOf('</svg>')).r
 (async () => {
   const master = await fs.readFile(path.join(directory, 'glucifer.svg'), 'utf8');
   const mark = body(master);
+  const [, , frameWidth, frameHeight] = master.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
   const app = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254"><title>Glucifer app icon</title><rect x="8" y="8" width="1238" height="1238" rx="232" fill="#101a2a"/>${mark}</svg>\n`;
   const homeAssistant = body(await fs.readFile(path.join(directory, 'home-assistant.svg'), 'utf8'));
   const font = (await fs.readFile(path.join(directory, 'Outfit.ttf'))).toString('base64');
@@ -23,7 +24,7 @@ const body = svg => svg.slice(svg.indexOf('>') + 1, svg.lastIndexOf('</svg>')).r
       [app,1254,1254,path.join(directory,'icon.png')],
       [app,256,256,path.join(brand,'icon.png')],
       [app,512,512,path.join(brand,'icon@2x.png')],
-      [master,512,626,path.join(directory,'mark.png')],
+      [master,512,Math.round(512*frameHeight/frameWidth),path.join(directory,'mark.png')],
       [banner,2172,724,path.join(directory,'banner.png')],
     ]) {
       await page.setViewportSize({width,height});
