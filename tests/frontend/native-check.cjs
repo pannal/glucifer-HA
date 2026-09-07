@@ -16,7 +16,7 @@ const {loadNativeChart} = require('./ha-native.cjs');
       const now=Date.now(); window.fetches=0;
       window.readings=Array.from({length:60},(_,i)=>({time_ms:now-(59-i)*60000,mgdl:100+i})).filter((_,i)=>i<10||i>25);
       window.journal=[{id:'j1',kind:'carbs',amount:25,label:'Carbohydrates',note:'<img src=x onerror=alert(1)>',time_ms:now-5*60000}];
-      window.fixture={locale:{language:'de',time_format:'24',date_format:'DMY',time_zone:'server'},config:{time_zone:'Europe/Berlin'},localize:key=>key,
+      window.fixture={locale:{language:'en-GB',time_format:'24',date_format:'DMY',time_zone:'server'},config:{time_zone:'Europe/Berlin'},localize:key=>key,
         states:{'sensor.g':{state:'159',attributes:{unit_of_measurement:'mg/dL'}},'sensor.time':{state:new Date(now-42000).toISOString(),attributes:{}}},
         callWS:async()=>{window.fetches++;return {entities:{measurement_time:'sensor.time'},readings:window.readings,journal:window.journal,journal_enabled:true};}};
       const card=document.createElement('glucifer-card');document.body.append(card);card.setConfig({entity:'sensor.g',hours:1,show_journal:true});card.hass=window.fixture;
@@ -157,7 +157,49 @@ const {loadNativeChart} = require('./ha-native.cjs');
     assert.match(await root.locator('.journal-selection').textContent(),/20 g/);
     await page.mouse.click(pill.x,pill.y);
     assert.equal(await root.locator('.journal-selection').isVisible(),false);
+    // Full-range chart space uses the normal cursor; zoom restores native pan affordance.
+    const chartSpace=await page.evaluate(()=>{const c=document.querySelector('glucifer-card').chartElement;const r=c.shadowRoot.querySelector('canvas').getBoundingClientRect();return{x:r.x+120,y:r.y+35};});
+    const chartCursor=()=>page.evaluate(()=>getComputedStyle(document.querySelector('glucifer-card').chartElement.chart.getZr().painter.getViewportRoot()).cursor);
+    await page.mouse.move(chartSpace.x,chartSpace.y);assert.equal(await chartCursor(),'default');
+    await page.evaluate(()=>document.querySelector('glucifer-card').chartElement.zoom(30,80));
+    await page.mouse.move(chartSpace.x+5,chartSpace.y);assert.equal(await chartCursor(),'grab');
+    await root.locator('ha-chart-base .zoom-reset').click();
+    await page.mouse.move(chartSpace.x,chartSpace.y);assert.equal(await chartCursor(),'default');
+    // Chart pills expand their matching visible row. Hidden/collapsed/limited lists use the fallback.
+    await page.mouse.move(pill.x,pill.y);assert.equal(await chartCursor(),'pointer');
+    await page.mouse.click(pill.x,pill.y);
+    assert.equal(await root.locator('.journal-entry[data-journal-id="j2"] > .journal-selection').isVisible(),true);
+    assert.equal(await root.locator('.journal-entry[data-journal-id="j2"] > button').getAttribute('aria-expanded'),'true');
+    await root.locator('.journal-entry[data-journal-id="j2"] > button').click();
+    assert.equal(await root.locator('.journal-selection').isVisible(),false);
+    await root.locator('.journal-entry[data-journal-id="j2"] > button').click();
+    assert.equal(await root.locator('.journal-entry[data-journal-id="j2"] > .journal-selection').isVisible(),true);
+    await root.locator('.journal-section summary').click();
+    await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.journal-selection').parentElement.tagName==='HA-CARD');
+    assert.equal(await root.locator('ha-card > .journal-selection').isVisible(),true);
+    await root.locator('.journal-section summary').click();
+    await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.journal-selection').parentElement.dataset.journalId==='j2');
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.setConfig({...card.config,journal_limit:1});});
+    assert.equal(await root.locator('ha-card > .journal-selection').isVisible(),true);
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.setConfig({...card.config,journal_limit:25,show_journal:false});});
+    assert.equal(await root.locator('ha-card > .journal-selection').isVisible(),true);
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.setConfig({...card.config,show_journal:true,locale:'de-DE',show_journal_symbols:true});});
+    assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').journalLabel({kind:'note',label:'My personal Note'})), 'My personal Note');
+    assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').journalLabel({kind:'insulin',label:'Fiasp'})), 'Fiasp');
+    assert.equal(await root.locator('.journal-title').textContent(),'Tagebuch');
+    assert.equal(await root.locator('.journal-summary-count').textContent(),'3 Einträge');
+    assert.match(await root.locator('.reading-age').textContent(),/^Messwert /);
+    assert.match(await root.locator('.journal-entry[data-journal-id="j3"] > button').textContent(),/Insulin · 2 E/);
+    assert.match(await root.locator('.journal-entry[data-journal-id="j4"] > button').textContent(),/^Notiz ·/);
+    assert.equal(await root.locator('.journal-selection button').textContent(),'Schließen');
+    assert.equal(await root.locator('ha-card > button').textContent(),'Weitere Details');
+    assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').chartElement.data[1].label.formatter({data:{journalId:'j3'}})), '{icon| } {value|2 E}');
+    assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').chartElement.data[3].label.formatter({data:{journalId:'j4'}})), '{icon| } {value|Notiz}');
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.toggleJournal('j4');});
+    assert.equal(await root.locator('.journal-entry[data-journal-id="j4"] > .journal-selection').isVisible(),true);
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.setConfig({...card.config,locale:''});card.selectedJournalId=null;card.renderSelection();});
     await require('./editor-check.cjs').checkNativeEditor(page);
+    await require('./prediction-check.cjs')(page);
     assert.deepEqual(errors,[]);
     console.log('Native HA chart checks passed: real canvas chip toggle, journal hover isolation, delayed nested theme colors, tooltip, gaps, seconds-only updates, stable selection, edits/deletes, zoom preservation, native editor defaults, slider drag/keyboard input, font/locale controls and retained preview data.');
   } finally { await browser.close(); }

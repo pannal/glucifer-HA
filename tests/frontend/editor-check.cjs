@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const {loadNativeEditor} = require('./ha-native.cjs');
 async function checkNativeEditor(page) {
+  await page.emulateMedia({reducedMotion:'reduce'});
   await loadNativeEditor(page);
   await page.evaluate(async () => {
     const card=document.querySelector('glucifer-card');
@@ -9,7 +10,7 @@ async function checkNativeEditor(page) {
     card.chartElement.zoom(35,90); card.toggleJournal('j2');
     window.originalEditorConfig=Object.freeze({type:'custom:glucifer-card',entity:'sensor.g',hours:1,show_journal:true,show_glucose_unit:false,custom_setting:'preserve'});
     const editor=await customElements.get('glucifer-card').getConfigElement();
-    const hass={...window.fixture, translationMetadata:{translations:{}}, states:Object.fromEntries(Object.entries(window.fixture.states).map(([id,state])=>[id,{...state,entity_id:id}])), entities:{},devices:{},areas:{},floors:{},labels:{},services:{},
+    const hass={...window.fixture, auth:{}, translationMetadata:{translations:{}}, states:Object.fromEntries(Object.entries(window.fixture.states).map(([id,state])=>[id,{...state,entity_id:id}])), entities:{},devices:{},areas:{},floors:{},labels:{},services:{},
       loadBackendTranslation:async()=>{},formatEntityName:entity=>entity.entity_id};
     const contexts={states:hass.states,hassInternationalization:hass,hassRegistries:hass,hassConfig:hass,hassFormatters:hass,hassApi:hass,hassConnection:hass};
     editor.addEventListener('context-request',event=>{
@@ -54,8 +55,11 @@ async function checkNativeEditor(page) {
   await editor.getByRole('textbox',{name:'Glucose font family',exact:true}).fill('Georgia');
   await number('Arrow length (px)').getByRole('spinbutton').fill('140');
   await number('Arrow stroke width (px)').getByRole('spinbutton').fill('9');
-  await editor.getByRole('textbox',{name:'Locale',exact:true}).fill('de-DE');
+  await editor.locator('ha-selector-select').filter({hasText:'Locale'}).click();
   await page.clock.runFor(500);
+  await editor.getByText('Deutsch (Deutschland)',{exact:true}).click();
+  await page.clock.runFor(500);
+  await page.waitForFunction(()=>document.querySelector('glucifer-card').config.locale==='de-DE',null,{polling:50});
   const result=await page.evaluate(()=>{
     const card=document.querySelector('glucifer-card'),editor=document.querySelector('glucifer-card-editor');
     return {saved:window.previewEdits.at(-1),calls:window.fetches,originalCalls:window.previewCalls,
@@ -71,20 +75,27 @@ async function checkNativeEditor(page) {
   assert.equal(Object.hasOwn(result.saved,'glucose_alignment'),false,'Unedited defaults remain absent from saved YAML');
   assert.equal(result.font,'Georgia');assert.equal(result.style,'italic');
   await page.evaluate(()=>{const editor=document.querySelector('glucifer-card-editor');editor.setConfig(window.previewEdits.at(-1));});
-  assert.equal(await editor.getByRole('radio',{name:'Lower, beside delta and IOB',exact:true}).getAttribute('aria-checked'),'true');
+  assert.equal(await editor.getByRole('radio',{name:'Darunter, neben Glukoseänderung und IOB',exact:true}).getAttribute('aria-checked'),'true');
   // A display edit while a push is loading retains old data until the response arrives.
   await page.evaluate(()=>{
     const card=document.querySelector('glucifer-card'),original=window.fixture.callWS;
     window.fixture.callWS=()=>new Promise(resolve=>{window.finishPreviewPush=async()=>{window.fixture.callWS=original;resolve(await original());};});
     card.refresh(true);
   });
-  await glucose.getByRole('spinbutton').fill('80');
+  await number('Glukose-Schriftgröße (px)').getByRole('spinbutton').fill('80');
   assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').data===window.previewData),true);
   assert.equal(await page.locator('glucifer-card .native-chart').isVisible(),true);
   await page.evaluate(()=>window.finishPreviewPush());
   await page.waitForFunction(()=>!document.querySelector('glucifer-card').loading);
   assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').config.glucose_size),80);
   assert.equal(await page.evaluate(()=>window.fetches),result.originalCalls+1);
+  await editor.locator('ha-selector-select').filter({hasText:'Sprache und Region'}).click();
+  await page.clock.runFor(500);
+  await editor.getByText('Home Assistant verwenden',{exact:true}).click();
+  await page.clock.runFor(500);
+  await page.waitForFunction(()=>document.querySelector('glucifer-card').config.locale==='',null,{polling:50});
+  assert.equal(await page.evaluate(()=>Object.hasOwn(window.previewEdits.at(-1),'locale')),false);
+  assert.match(await editor.locator('ha-selector-select').filter({hasText:'Locale'}).ariaSnapshot(),/Home Assistant/);
   await page.evaluate(()=>document.querySelector('glucifer-card-editor').remove());
 }
 module.exports={checkNativeEditor};

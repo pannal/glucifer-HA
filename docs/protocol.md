@@ -183,3 +183,34 @@ current history. Freshness timer ticks do not generate these events. An
 integration unload sends an additional `"reload": true`; clients should
 resubscribe once the entry is available again. Neither command exposes the
 webhook secret or source identifier.
+
+
+## Prediction curves (Glucifer 0.5.3+)
+
+Live snapshots in either schema version may include a top-level `predictions`
+array. It replaces the preceding curves; omission or `[]` clears them. Older
+receivers ignore this extension. No prediction points enter measurement history,
+HA glucose sensors, or alert state.
+
+```json
+"predictions": [{"kind": "auto", "points": [
+  {"time_ms": 1788695990000, "mgdl": 123},
+  {"time_ms": 1788696290000, "mgdl": 130.5}
+]}]
+```
+
+Up to three curves are allowed, with distinct `raw`, `auto`, or `calibrated`
+kinds. Each has 2 to 121 strictly increasing points, containing only `time_ms`
+and `mgdl`. The first timestamp must be within two minutes before the snapshot's
+measurement; the final timestamp must be within six hours of that baseline.
+Values use the same finite, positive, numeric bounds as glucose. The 32 KiB
+request limit still applies. Predictions share the live snapshot's durable
+sequence and retry handling, and changed curves cause a new snapshot even if
+the measured glucose is unchanged. The card omits curves whose baseline is over
+ten minutes old or whose entire horizon has passed.
+
+NG computes these curves using its dashboard prediction pipeline, sensor display
+mode, local smoothing, calibration, profile and journal settings. Prediction
+export is separately disabled by default. It respects NG's master prediction
+switch and does not depend on the notification chart switch. Journal changes
+use fresh entries and presets, without the notification chart's short cache.

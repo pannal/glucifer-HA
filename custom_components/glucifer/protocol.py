@@ -69,6 +69,7 @@ def validate_snapshot(payload: object, now_ms: int) -> dict:
             raise InvalidSnapshot("invalid_battery")
     if any(value is not None and type(value) is not bool for value in alerts.values()):
         raise InvalidSnapshot("invalid_alert")
+    predictions = validate_predictions(payload.get("predictions", []), measured)
     return deepcopy(
         {
             "schema_version": payload["schema_version"],
@@ -78,6 +79,7 @@ def validate_snapshot(payload: object, now_ms: int) -> dict:
             "glucose": {"time_ms": measured, "mgdl": value},
             "fields": fields,
             "alerts": alerts,
+            **({"predictions": predictions} if "predictions" in payload else {}),
         }
     )
 
@@ -153,3 +155,38 @@ def validate_backfill_status(payload):
         ):
             raise InvalidSnapshot("invalid_backfill_status")
     return deepcopy(payload)
+
+
+def validate_predictions(curves, measured):
+    """Bound forward display curves separately from measured history."""
+    if not isinstance(curves, list) or len(curves) > 3:
+        raise InvalidSnapshot("invalid_predictions")
+    kinds = set()
+    for curve in curves:
+        if not isinstance(curve, dict) or set(curve) != {"kind", "points"}:
+            raise InvalidSnapshot("invalid_predictions")
+        kind = curve["kind"]
+        if not isinstance(kind, str) or kind not in {"raw", "auto", "calibrated"} or kind in kinds:
+            raise InvalidSnapshot("invalid_predictions")
+        kinds.add(kind)
+        points = curve["points"]
+        if not isinstance(points, list) or not 2 <= len(points) <= 121:
+            raise InvalidSnapshot("invalid_predictions")
+        previous = 0
+        baseline = None
+        for point in points:
+            if not isinstance(point, dict) or set(point) != {"time_ms", "mgdl"}:
+                raise InvalidSnapshot("invalid_predictions")
+            stamp, value = point["time_ms"], point["mgdl"]
+            if not _integer(stamp) or stamp <= previous:
+                raise InvalidSnapshot("invalid_predictions")
+            if baseline is None:
+                baseline = stamp
+                if not measured - 120000 <= baseline <= measured:
+                    raise InvalidSnapshot("invalid_predictions")
+            if stamp > baseline + 21600000:
+                raise InvalidSnapshot("invalid_predictions")
+            if type(value) not in (int, float) or not math.isfinite(value) or not 0 < value <= 1000:
+                raise InvalidSnapshot("invalid_predictions")
+            previous = stamp
+    return curves

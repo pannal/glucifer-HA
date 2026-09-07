@@ -70,6 +70,7 @@ def history(hass, connection, msg):
         msg["id"],
         {
             "readings": coordinator.merge_history(coordinator.history, []),
+            "predictions": (coordinator.data or {}).get("predictions", []),
             "journal": retained_entries(coordinator.journal, coordinator.now_ms),
             "journal_enabled": coordinator.journal["enabled"],
             "journal_history_days": coordinator.journal["history_days"],

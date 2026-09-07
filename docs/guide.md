@@ -245,17 +245,32 @@ until closed, removed, or hidden by a filter.
 
 Sensor and journal dates use your HA profile's language, date order, 12/24-hour
 format, and browser/server time-zone preference. UTC timestamps are converted
-before display. **Locale** can override number and date formatting for this
-card, for example `de-DE`, `en-GB` or `fr-FR`. Leave it empty to follow HA's
-preferences. The override does not change units, time zone or interface labels.
+before display. **Locale** is a dropdown with **Use Home Assistant**, German
+and English variants, plus custom locale codes. German locales translate card
+and editor labels and display insulin units as `E`, including IOB, eIOB and
+journal entries. Generic “Note” entries become “Notiz”; custom names and notes
+stay unchanged. Other locales currently fall back to English labels while
+formatting numbers and dates for the selected region. Glucose units and time
+zone stay as configured in HA.
 Display edits keep the loaded history, subscription, zoom and journal selection;
-a change of glucose entity clears the old receiver's data.
+a change of glucose entity clears the old receiver's data. Because HA recreates
+preview elements after config edits, recent history and pending requests are
+shared by connection, user and receiver. This memory-only cache retains at most
+eight receiver/user combinations per connection for five minutes. It preserves
+original measurement timestamps and never substitutes old history for an
+explicitly empty response.
 
 The card reuses HA's native chart component with Glucifer's stored readings.
 Hover to inspect values, hold Ctrl (Command on Mac) while scrolling to zoom,
-drag to pan, and use HA's reset control to restore the full window. Touch
+drag to pan once zoomed, and use HA's reset control to restore the full window.
+The cursor is normal at the full range and becomes a grab cursor when zoomed. Touch
 screens support pinch zoom. Journal pills remain selectable while zoomed. Click an entry again to close
 its details. Hovering journal markers or chips suppresses the glucose tooltip.
+Selecting a journal row expands the details underneath it. Selecting a chart
+pill uses that same row when it is visible in the list; otherwise, the details
+appear in the separate panel. This covers a hidden or collapsed list and
+entries excluded by the list limit. Selecting the same entry again closes it.
+
 Colored pills show insulin units, carbohydrate grams, or the note label, with
 connector lines to their glucose anchors. Nearby pills are staggered; crowded
 labels are hidden when they cannot fit. Zoom in to see more labels.
@@ -513,3 +528,19 @@ code sharing between the sender and receiver.
 
 Copyright (C) 2026 pannal and contributors. JugglucoNG and any reused assets
 retain their respective copyrights.
+
+
+## Prediction curves
+
+Requires Glucifer **0.5.3+** and a JugglucoNG build with prediction export.
+In NG's Glucifer API destination, enable **Prediction** (**Prognose** in German).
+Keep NG's main prediction setting enabled. In the card editor, under **Display**,
+enable **Show prediction curves** (**Prognosekurven anzeigen**). Both export and
+card display are off by default.
+
+The dashed lines extend into the future using NG's current raw, auto and
+calibrated curves, according to its sensor display mode and calibration settings.
+The horizon and model settings come from NG. Hover a curve to see its name, time
+and projected value. These are model projections, separate from stored glucose
+readings. The card hides them when their baseline is over ten minutes old.
+Journal saves can change the curves immediately, without waiting for new glucose.

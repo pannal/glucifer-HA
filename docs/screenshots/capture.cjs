@@ -38,11 +38,13 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
     }));
     await page.addScriptTag({ path: path.join(__dirname, '../../custom_components/glucifer/frontend/glucifer-card.js') });
     for (const variant of [
+      {dark:false, name:'dashboard-predictions', config:{show_predictions:true,show_journal:false,hours:3}},
       {dark:false, name:'dashboard-mgdl-interactive', config:{}},
       {dark:true, name:'dashboard-mmol-interactive', config:{}},
       {dark:true, name:'dashboard-centered-active-insulin', config:{glucose_size:64,glucose_alignment:'center',show_glucose_unit:false,show_eiob_u:true}},
       {dark:true, name:'dashboard-lower-arrow', config:{glucose_size:64,glucose_alignment:'center',show_glucose_unit:false,show_eiob_u:true,arrow_position:'details'}},
       {dark:true, name:'dashboard-typography-locale', config:{glucose_size:96,glucose_alignment:'center',show_glucose_unit:false,arrow_position:'details',arrow_length:140,arrow_width:4,glucose_font:'Georgia',glucose_weight:400,glucose_style:'italic',locale:'de-DE',show_eiob_u:true}},
+      {dark:false, name:'dashboard-inline-journal', config:{show_journal:true,locale:'de-DE'}, selected:'j3'},
       {dark:false, name:'dashboard-expanded-journal', config:{glucose_size:48,arrow_size:64,journal_compact:false,show_logo:false,show_journal_symbols:true}},
     ]) {
       await page.evaluate(({dark,config}) => {
@@ -55,6 +57,8 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
         document.documentElement.style.setProperty("--graph-color-1", colors[4]);
         document.documentElement.style.setProperty("--color-1", colors[4]);
         document.documentElement.style.setProperty("--info-color", colors[4]);
+        const german = config.locale?.startsWith('de');
+        document.querySelector('header').textContent = german ? 'Glucifer HA · Beispieldaten' : 'Glucifer HA · Sample data';
         const now = Date.now();
         const state = (value, attributes = {}) => ({ state: value, attributes });
         const unit = dark ? 'mmol/L' : 'mg/dL';
@@ -69,7 +73,7 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
         const journal = [
           {id:'j1',time_ms:now-300*60000,kind:'carbs',amount:35,label:'Carbohydrates'},
           {id:'j2',time_ms:now-295*60000,kind:'insulin',amount:2.5,label:'Insulin'},
-          {id:'j3',time_ms:now-90*60000,kind:'note',label:'Note',note:'Sample journal note'},
+          {id:'j3',time_ms:now-90*60000,kind:'note',label:'Note',note:german ? 'Beispielnotiz zum Eintrag' : 'Sample journal note'},
           {id:'j4',time_ms:now-55*60000,kind:'carbs',amount:12,label:'Carbohydrates'},
         ];
         const fixture = {locale:{language:"en-GB",time_format:"24",date_format:"DMY",time_zone:"server"},config:{time_zone:"Europe/Berlin"},localize:key=>key, states: {
@@ -81,15 +85,19 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
           [entities.delta_mgdl]: state('0', { unit_of_measurement: unit }),
           [entities.reading_age]: state('42'), [entities.measurement_time]:state(new Date(now-42000).toISOString()),
           [entities.connected]: state('on'), [entities.stale]: state('off'),
-        }, callWS: async () => ({ entities, unit, readings, journal, journal_enabled:true, journal_history_days:7 }) };
+        }, callWS: async () => ({ entities, unit, readings, predictions:config.show_predictions ? [
+          {kind:"auto",points:Array.from({length:25},(_,i)=>({time_ms:now+i*300000,mgdl:123-25*(1-Math.exp(-i/9))+i*0.5}))},
+          {kind:"raw",points:Array.from({length:25},(_,i)=>({time_ms:now+i*300000,mgdl:126-15*(1-Math.exp(-i/10))+i*0.8}))}
+        ] : [], journal, journal_enabled:true, journal_history_days:7 }) };
         const card = document.querySelector('glucifer-card');
         card.hass = fixture;
-        card.setConfig({ entity: entities.glucose, title: 'Glucose', hours: 6, show_journal:true, journal_limit:4, ...config });
+        card.setConfig({ entity: entities.glucose, title: german ? 'Glukose' : 'Glucose', hours: 6, show_journal:true, journal_limit:4, ...config });
       }, variant);
       await page.waitForFunction(() => {
         const card = document.querySelector('glucifer-card');
-        return card.data && !card.loading && card.chartElement?.chart?.getOption().series?.length === 4;
+        return card.data && !card.loading && card.chartElement?.chart?.getOption().series?.length === (card.config.show_predictions ? 6 : 4);
       });
+      if (variant.selected) await page.evaluate(id=>document.querySelector('glucifer-card').toggleJournal(id),variant.selected);
       await page.clock.runFor(200);
       await page.waitForFunction(()=>{const logo=document.querySelector('glucifer-card').shadowRoot.querySelector('.brand-logo');return logo.hidden || logo.naturalWidth > 0;});
       await page.locator('main').screenshot({
@@ -97,7 +105,7 @@ const {loadNativeChart} = require('../../tests/frontend/ha-native.cjs');
       });
     }
     if (errors.length) throw new Error(errors.join('\n'));
-    console.log('Captured six dashboard previews from the bundled card using synthetic data.');
+    console.log('Captured eight dashboard previews from the bundled card using synthetic data.');
   } finally {
     await browser.close();
   }

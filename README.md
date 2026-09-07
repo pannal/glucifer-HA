@@ -1,6 +1,6 @@
 # Glucifer for Home Assistant
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png?v=0.5.2" alt="Glucifer HA: horned glucose drop and insulin pen beside the Home Assistant icon and Glucifer HA lettering" width="100%">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/brand/banner.png?v=0.5.3" alt="Glucifer HA: horned glucose drop and insulin pen beside the Home Assistant icon and Glucifer HA lettering" width="100%">
 
 Bring [JugglucoNG](https://github.com/ctqvva/JugglucoNG) glucose readings into
 Home Assistant through a private webhook. Includes mg/dL and mmol/L,
@@ -63,24 +63,34 @@ and dark themes. These are card previews, not captures from a live HA installati
 
 | mg/dL with journal markers and history | mmol/L with journal markers and history |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png?v=0.5.2" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png?v=0.5.2" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mgdl-interactive.png?v=0.5.3" alt="Glucifer card displaying 123 mg/dL, a colored trend arrow, insulin and carbohydrate chart markers, and a journal history list" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-mmol-interactive.png?v=0.5.3" alt="Glucifer card in dark mode displaying 6.8 mmol/L, a colored trend arrow, journal markers, and a journal history list" width="400"> |
 
 <details>
 <summary><strong>More card layouts</strong></summary>
 
 | Centered value, hidden unit and active insulin | Expanded journal, optional markers and hidden logo |
 | --- | --- |
-| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-centered-active-insulin.png?v=0.5.2" alt="Dark card with a centered 6.8 glucose value and Insulin on board: 5.2 U (Active: 1.7 U)" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-expanded-journal.png?v=0.5.2" alt="Light card with a larger 123 mg/dL value, optional chart markers and padded journal rows" width="400"> |
+| <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-centered-active-insulin.png?v=0.5.3" alt="Dark card with a centered 6.8 glucose value and Insulin on board: 5.2 U (Active: 1.7 U)" width="400"> | <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-expanded-journal.png?v=0.5.3" alt="Light card with a larger 123 mg/dL value, optional chart markers and padded journal rows" width="400"> |
 
 **Arrow position: lower, beside delta and IOB** keeps the arrow on the right
 while giving the glucose value its own row.
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-lower-arrow.png?v=0.5.2" alt="Centered glucose above the delta and active insulin details, with the trend arrow at the right of the details" width="400">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-lower-arrow.png?v=0.5.3" alt="Centered glucose above the delta and active insulin details, with the trend arrow at the right of the details" width="400">
+
+**Optional predictions**: dashed NG projection curves extend into the future.
+Enable prediction export in NG and **Show prediction curves** in the card editor.
+Both are off by default. [Setup and behavior](docs/guide.md#prediction-curves)
+
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-predictions.png?v=0.5.3" alt="Glucose card with optional dashed raw and auto prediction curves extending beyond the measured history" width="400">
 
 **Typography and locale**: an italic Georgia value, a longer, thinner arrow,
-and German number/date formatting. Fonts come from the browser.
+and German labels, dates and numbers, including `E` for insulin units. Fonts come from the browser.
 
-<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-typography-locale.png?v=0.5.2" alt="Dark card showing a large italic 6,8 glucose value, a longer thin arrow beside details, and German number formatting" width="400">
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-typography-locale.png?v=0.5.3" alt="Dark card showing a large italic 6,8 glucose value, a longer thin arrow beside details, and German labels with E for insulin units" width="400">
+
+**Inline journal details**: selecting a row expands it directly in the list.
+
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-inline-journal.png?v=0.5.3" alt="German Glucifer card with a Notiz entry expanded in place in the Tagebuch list" width="400">
 
 These options are available in the card's visual editor.
 
@@ -113,9 +123,12 @@ the unit beside the main value. Large sizes scale down only when needed to fit.
 Numeric settings have sliders and precise entry fields. **Arrow length** and
 **Arrow stroke width** can be set independently, or left empty to follow arrow
 size. The glucose value has font weight, normal/italic style, and local font
-family controls. **Locale** accepts values such as `de-DE` or `en-GB`; leave it
-empty to follow HA's number and date preferences. Units and time zone stay as
-configured in HA. Editing these options keeps loaded data and chart zoom.
+family controls. **Locale** offers Home Assistant preferences, German and English
+variants in a dropdown, with custom locale codes available. German translates
+the card and editor labels, including generic journal labels such as “Notiz,”
+and displays insulin units as `E`. Other languages currently use English labels
+with their own number/date formatting. Glucose units and time zone follow HA.
+Recent history is reused when HA recreates the preview during an edit.
 
 For eIOB, enable **Show effective IOB (eIOB)** in NG's Glucifer destination
 and **Active insulin (eIOB)** in the card editor. With IOB visible, the card
@@ -138,6 +151,10 @@ for a glucose reading. **Include notes and note entries** is a separate opt-in.
 Choose how much history to send, from 1 to 90 days; the default is 7 days.
 
 The chart shows journal pills with colored icons, amounts and connector lines.
+Clicking a journal row expands its details in place. A chart click expands the
+matching visible row; the separate details area is used when the list is hidden,
+collapsed, or that entry is outside the displayed list. Click the entry again
+to close it. The drag cursor appears only when the chart is zoomed in.
 **Show chart marker symbols and legend** adds the triangle/circle/square markers
 and their legend; it is off by default. Select a pill
 (or a marker when enabled) for details; select it again to close them. Hovering a journal

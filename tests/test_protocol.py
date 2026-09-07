@@ -129,3 +129,88 @@ def test_history_batch_bounds_and_order(snapshot):
     ]:
         with pytest.raises(InvalidSnapshot):
             validate_history({**batch, "readings": readings}, snapshot["sent_at_ms"])
+
+
+def prediction(snapshot):
+    baseline = snapshot["glucose"]["time_ms"]
+    return [
+        {
+            "kind": "auto",
+            "points": [
+                {"time_ms": baseline, "mgdl": 123},
+                {"time_ms": baseline + 300000, "mgdl": 130.5},
+            ],
+        }
+    ]
+
+
+def test_predictions_are_optional_copied_and_replaced(snapshot):
+    snapshot["predictions"] = prediction(snapshot)
+    validated = validate_snapshot(snapshot, snapshot["sent_at_ms"])
+    snapshot["predictions"][0]["points"][1]["mgdl"] = 135
+    assert validated["predictions"][0]["points"][1]["mgdl"] == 130.5
+    assert validated["glucose"] == snapshot["glucose"]
+    changed = snapshot | {"sequence": 2}
+    assert (
+        classify_snapshot(validated, validate_snapshot(changed, snapshot["sent_at_ms"]))
+        == "accepted"
+    )
+    changed["predictions"] = []
+    assert validate_snapshot(changed, snapshot["sent_at_ms"])["predictions"] == []
+    changed.pop("predictions")
+    assert "predictions" not in validate_snapshot(changed, snapshot["sent_at_ms"])
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "null",
+        "object",
+        "kind",
+        "duplicate",
+        "size",
+        "empty",
+        "long",
+        "past",
+        "future_baseline",
+        "order",
+        "horizon",
+        "nan",
+        "bool",
+        "zero",
+    ],
+)
+def test_invalid_prediction_curves(snapshot, case):
+    curves = prediction(snapshot)
+    points = curves[0]["points"]
+    if case == "null":
+        curves = None
+    elif case == "object":
+        curves = {}
+    elif case == "kind":
+        curves[0]["kind"] = "invented"
+    elif case == "duplicate":
+        curves += deepcopy(curves)
+    elif case == "size":
+        curves *= 4
+    elif case == "empty":
+        points.clear()
+    elif case == "long":
+        points.extend(deepcopy(points) * 61)
+    elif case == "past":
+        points[0]["time_ms"] -= 120001
+    elif case == "future_baseline":
+        points[0]["time_ms"] += 1
+    elif case == "order":
+        points[1]["time_ms"] = points[0]["time_ms"]
+    elif case == "horizon":
+        points[1]["time_ms"] = points[0]["time_ms"] + 21600001
+    elif case == "nan":
+        points[1]["mgdl"] = float("nan")
+    elif case == "bool":
+        points[1]["mgdl"] = True
+    elif case == "zero":
+        points[1]["mgdl"] = 0
+    snapshot["predictions"] = curves
+    with pytest.raises(InvalidSnapshot, match="invalid_predictions"):
+        validate_snapshot(snapshot, snapshot["sent_at_ms"])

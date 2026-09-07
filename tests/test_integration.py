@@ -659,3 +659,35 @@ async def test_active_insulin_is_optional_and_cleared(hass, receiver, snapshot):
     del snapshot["fields"]["eiob_u"]
     await send(hass, client, snapshot)
     assert hass.states.get("sensor.phone_active_insulin").state == "unavailable"
+
+
+async def test_predictions_survive_reload_and_never_enter_measurement_history(
+    hass, receiver, snapshot, hass_ws_client
+):
+    entry, client = receiver
+    baseline = snapshot["glucose"]["time_ms"]
+    snapshot["predictions"] = [
+        {
+            "kind": "auto",
+            "points": [
+                {"time_ms": baseline, "mgdl": 123},
+                {"time_ms": baseline + 300000, "mgdl": 140},
+            ],
+        }
+    ]
+    assert (await send(hass, client, snapshot)).status == 200
+    assert entry.runtime_data.history == [snapshot["glucose"]]
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "glucifer/history", "entity_id": "sensor.phone_glucose"})
+    data = (await ws.receive_json())["result"]
+    assert data["predictions"] == snapshot["predictions"]
+    assert data["readings"] == [snapshot["glucose"]]
+    snapshot["sequence"] += 1
+    snapshot.pop("predictions")
+    assert (await send(hass, client, snapshot)).status == 200
+    await ws.send_json({"id": 2, "type": "glucifer/history", "entity_id": "sensor.phone_glucose"})
+    data = (await ws.receive_json())["result"]
+    assert data["predictions"] == []
+    assert data["readings"] == [snapshot["glucose"]]
