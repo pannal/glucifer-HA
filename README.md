@@ -50,6 +50,9 @@ JugglucoNG build noted above.
    value and measurement time, then tap **Done** in NG.
 7. Refresh your HA browser, edit the dashboard, and choose **Add card > Glucifer HA**.
    Pick the phone's glucose entity. The card registers automatically.
+   **Optional predictions:** enable **Prediction** in NG's Glucifer destination,
+   then **Display > Show prediction curves** in the card editor. Requires Glucifer
+   **0.5.3+** and the updated NG sender; both switches start off.
 
 The phone must be able to reach Home Assistant. **Accept local requests only**
 starts off for new connections. If HA shows only `/api/webhook/...`, prepend
