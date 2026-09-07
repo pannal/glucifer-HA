@@ -43,7 +43,8 @@ const {loadNativeChart} = require('./ha-native.cjs');
     });
     await page.mouse.click(marker.x,marker.y);
     assert.equal(await root.locator('.journal-selection').isVisible(),true);
-    assert.match(await root.locator('.journal-selection').textContent(),/25 g/);
+    assert.match(await root.locator('.journal-entry.selected').textContent(),/25 g/);
+    assert.equal(await root.locator('.selection-label').textContent(),'');
     assert.equal(await root.locator('img:not(.brand-logo)').count(),0);
     // The rendered chip itself opens details, just like its underlying marker.
     await root.locator('.journal-selection button').click();
@@ -111,7 +112,7 @@ const {loadNativeChart} = require('./ha-native.cjs');
     await page.clock.runFor(32);
     await page.waitForFunction(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().series[2].label.backgroundColor==='rgb(238, 242, 246)');
     await page.evaluate(()=>{window.journal=window.journal.map(e=>({...e,amount:30}));document.querySelector('glucifer-card').refresh(true);});
-    await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.selection-label').textContent.includes('30 g'));
+    await page.waitForFunction(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.journal-entry.selected > .journal-entry-label').textContent.includes('30 g'));
     assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').chartElement===window.savedChart),true);
     assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().dataZoom[0].start),zoom);
     assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').shadowRoot.querySelector('.journal-selection button')===window.savedClose),true);
@@ -124,7 +125,7 @@ const {loadNativeChart} = require('./ha-native.cjs');
     await page.waitForFunction(()=>document.querySelector('glucifer-card').chartElement.chart.getOption().dataZoom[0].start===0);
     await page.evaluate(()=>{
       const card=document.querySelector('glucifer-card');card.config.show_journal_symbols=false;
-      window.journal=[{id:'j2',kind:'carbs',amount:20,time_ms:Date.now()-5*60000,label:'Carbohydrates'},
+      window.journal=[{id:'j2',kind:'carbs',amount:20,note:'After lunch',time_ms:Date.now()-5*60000,label:'Carbohydrates'},
         {id:'j3',kind:'insulin',amount:2,time_ms:Date.now()-5*60000-30000,label:'Insulin'},
         {id:'j4',kind:'note',time_ms:Date.now()-5*60000+30000,label:'Note'}];card.refresh(true);
     });
@@ -154,7 +155,8 @@ const {loadNativeChart} = require('./ha-native.cjs');
     assert.equal(pill.opacity,0.8);assert.equal(pill.width,1.5);
     await page.mouse.click(pill.x,pill.y);
     assert.equal(await root.locator('.journal-selection').isVisible(),true);
-    assert.match(await root.locator('.journal-selection').textContent(),/20 g/);
+    assert.match(await root.locator('.journal-selection').textContent(),/After lunch/);
+    assert.doesNotMatch(await root.locator('.journal-selection').textContent(),/20 g/);
     await page.mouse.click(pill.x,pill.y);
     assert.equal(await root.locator('.journal-selection').isVisible(),false);
     // Full-range chart space uses the normal cursor; zoom restores native pan affordance.
@@ -189,14 +191,23 @@ const {loadNativeChart} = require('./ha-native.cjs');
     assert.equal(await root.locator('.journal-title').textContent(),'Tagebuch');
     assert.equal(await root.locator('.journal-summary-count').textContent(),'3 Einträge');
     assert.match(await root.locator('.reading-age').textContent(),/^Messwert /);
-    assert.match(await root.locator('.journal-entry[data-journal-id="j3"] > button').textContent(),/Insulin · 2 E/);
-    assert.match(await root.locator('.journal-entry[data-journal-id="j4"] > button').textContent(),/^Notiz ·/);
+    assert.match(await root.locator('.journal-entry[data-journal-id="j3"] > .journal-entry-label').textContent(),/Insulin · 2 E/);
+    assert.match(await root.locator('.journal-entry[data-journal-id="j4"] > .journal-entry-label').textContent(),/^Notiz ·/);
     assert.equal(await root.locator('.journal-selection button').textContent(),'Schließen');
     assert.equal(await root.locator('ha-card > button').textContent(),'Weitere Details');
     assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').chartElement.data[1].label.formatter({data:{journalId:'j3'}})), '{icon| } {value|2 E}');
     assert.equal(await page.evaluate(()=>document.querySelector('glucifer-card').chartElement.data[3].label.formatter({data:{journalId:'j4'}})), '{icon| } {value|Notiz}');
     await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.toggleJournal('j4');});
-    assert.equal(await root.locator('.journal-entry[data-journal-id="j4"] > .journal-selection').isVisible(),true);
+    assert.equal(await root.locator('.journal-selection').isVisible(),false);
+    assert.equal(await root.locator('.journal-entry[data-journal-id="j4"].selected').count(),1);
+    assert.equal(await root.locator('.journal-entry[data-journal-id="j4"] > button').count(),0);
+    // No expansion when the note only repeats the visible label, including whitespace.
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.journalEntries.find(e=>e.id==='j4').note=' Note ';card.render();});
+    assert.equal(await root.locator('.journal-entry[data-journal-id="j4"] > button').count(),0);
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.setConfig({...card.config,show_journal:false});});
+    assert.equal(await root.locator('ha-card > .journal-selection').isVisible(),true);
+    assert.match(await root.locator('.selection-label').textContent(),/^Notiz ·/);
+    await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.setConfig({...card.config,show_journal:true});});
     await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.setConfig({...card.config,locale:''});card.selectedJournalId=null;card.renderSelection();});
     await require('./editor-check.cjs').checkNativeEditor(page);
     await require('./prediction-check.cjs')(page);

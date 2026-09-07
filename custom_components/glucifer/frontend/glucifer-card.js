@@ -37,7 +37,6 @@ const GLUCIFER_DE = {
   "Unavailable": "Nicht verfügbar",
   "Yes": "Ja",
   "No": "Nein",
-  "Active": "Aktiv",
   "U": "E",
   "Insulin": "Insulin",
   "Carbohydrates": "Kohlenhydrate",
@@ -443,12 +442,13 @@ class GluciferCard extends HTMLElement {
       ul {padding-left:20px} button {margin-top:12px;border:0;background:none;color:var(--primary-color);cursor:pointer}
       .journal-marker {stroke:var(--card-background-color,#fff);stroke-width:1.5;cursor:pointer}
       .journal-marker:focus {outline:none;stroke:var(--primary-text-color);stroke-width:3}
-      .journal-list {display:grid;gap:6px} .journal-list button {text-align:left;margin:0;padding:8px;border:1px solid var(--divider-color);border-radius:6px}
+      .journal-list {display:grid;gap:6px} .journal-list button, .journal-entry-label {box-sizing:border-box;display:block;font-size:14px;line-height:20px;text-align:left;margin:0;padding:8px;border:1px solid var(--divider-color);border-radius:6px}
       .journal-section {margin-top:12px} .journal-section summary {display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;font-weight:600;padding:8px 0}
       .journal-section summary::-webkit-details-marker {display:none} .journal-section summary::before {content:"▸"} .journal-section[open] summary::before {content:"▾"}
       .journal-summary-count {margin-left:auto;font-size:12px;font-weight:400;color:var(--secondary-text-color)}
       .journal-section.compact .journal-count {display:none} .journal-section.compact .journal-list {gap:0}
-      .journal-section.compact .journal-list button {border:0;border-radius:0;padding:4px 0;min-height:28px;font-size:14px;line-height:20px}
+      .journal-section.compact .journal-list button, .journal-section.compact .journal-entry-label {border:0;border-radius:0;padding:4px 0;min-height:28px;font-size:14px;line-height:20px}
+      .journal-entry.selected > .journal-entry-label {background:var(--secondary-background-color);border-radius:4px}
       .journal-selection {padding:12px;border:1px solid var(--divider-color);border-radius:8px;white-space:pre-wrap}
       .journal-entry .journal-selection {padding:8px 0 8px 12px;margin:2px 0 6px;border:0;border-left:2px solid var(--divider-color);border-radius:0}
       .journal-selection button {margin:8px 0 0;padding:0;border:0}
@@ -567,10 +567,10 @@ class GluciferCard extends HTMLElement {
       if (key === "sensor_warmup") return this.t(s.state === "on" ? "Yes" : "No");
       const numeric = !GLUCIFER_SENSOR_FIELDS.includes(key) && Number.isFinite(Number(s.state));
       const value = `${numeric ? this.formatNumber(Number(s.state), 1, s.state.includes(".") ? 1 : 0) : s.state}${s.attributes.unit_of_measurement ? ` ${["iob_u", "eiob_u"].includes(key) ? this.t("U") : s.attributes.unit_of_measurement}` : ""}`;
-      return key === "iob_u" && available("eiob_u") ? `${value} (${this.t("Active")}: ${formatted("eiob_u")})` : value;
+      return key === "iob_u" && available("eiob_u") ? `${value} (eIOB: ${formatted("eiob_u")})` : value;
     };
     for (const [selector, keys] of [[".lifecycle", GLUCIFER_SENSOR_FIELDS], [".optional-values", ["rate_mgdl_min", "raw_mgdl", "auto_mgdl", "iob_u", ...(!available("iob_u") ? ["eiob_u"] : []), "cob_g", "battery_percent"]]]) {
-      text(selector, keys.filter(available).map(key => `${this.t(GLUCIFER_FIELDS[key])}: ${formatted(key)}`).join(" · "));
+      text(selector, keys.filter(available).map(key => `${key === "iob_u" ? "IOB" : key === "eiob_u" ? "eIOB" : this.t(GLUCIFER_FIELDS[key])}: ${formatted(key)}`).join(" · "));
       root.querySelector(selector).hidden = !root.querySelector(selector).textContent;
     }
     this.fitReading();
@@ -621,8 +621,11 @@ class GluciferCard extends HTMLElement {
         : this.t("Enable journal sync in JugglucoNG to display entries.");
       for (const entry of visible) {
         const row = document.createElement("div"); row.className = "journal-entry"; row.dataset.journalId = entry.id;
-        const button = document.createElement("button"); button.className = "journal-entry-toggle";
-        button.textContent = description(entry); button.onclick = () => select(entry);
+        const expandable = Boolean(this.journalNote(entry));
+        const button = document.createElement(expandable ? "button" : "span");
+        button.className = `journal-entry-label${expandable ? " journal-entry-toggle" : ""}`;
+        button.textContent = description(entry);
+        if (expandable) button.onclick = () => select(entry);
         row.append(button); root.querySelector(".journal-list").append(row);
       }
     }
@@ -778,10 +781,15 @@ class GluciferCard extends HTMLElement {
     const row = entry && this.config.show_journal && section.open && rows.find(row => row.dataset.journalId === entry.id);
     if (row) { if (panel.parentElement !== row) row.append(panel); }
     else if (panel.parentElement !== section.parentElement) section.before(panel);
-    for (const item of rows) item.querySelector(".journal-entry-toggle").setAttribute("aria-expanded", String(item === row));
-    panel.hidden = !entry;
-    root.querySelector(".selection-label").textContent = entry ? this.journalDescription(entry) : "";
-    root.querySelector(".selection-note").textContent = entry?.note || "";
+    for (const item of rows) {
+      item.classList.toggle("selected", item === row);
+      item.querySelector(".journal-entry-toggle")?.setAttribute("aria-expanded", String(item === row));
+    }
+    const note = entry ? this.journalNote(entry) : "";
+    panel.hidden = !entry || Boolean(row && !note);
+    // The inline row already contains the name, amount and time.
+    root.querySelector(".selection-label").textContent = entry && !row ? this.journalDescription(entry) : "";
+    root.querySelector(".selection-note").textContent = note;
     root.querySelector(".journal-selection button").onclick = () => { this.selectedJournalId = null; this.renderSelection(); };
   }
   updateAge() {
@@ -826,6 +834,10 @@ class GluciferCard extends HTMLElement {
     glucose.style.fontSize = `${fit}px`;
   }
   t(text, values) { return gluciferText(this.config?.locale || this._hass?.locale?.language, text, values); }
+  journalNote(entry) {
+    const note = entry.note?.trim() || "";
+    return note === (entry.label || "").trim() || note === this.journalLabel(entry).trim() ? "" : note;
+  }
   journalLabel(entry) {
     const fallback = ({insulin:"Insulin",carbs:"Carbohydrates",note:"Note"})[entry.kind] || entry.kind;
     // Only translate generic protocol labels; custom names and note text are user data.

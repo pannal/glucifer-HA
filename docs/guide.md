@@ -266,10 +266,12 @@ drag to pan once zoomed, and use HA's reset control to restore the full window.
 The cursor is normal at the full range and becomes a grab cursor when zoomed. Touch
 screens support pinch zoom. Journal pills remain selectable while zoomed. Click an entry again to close
 its details. Hovering journal markers or chips suppresses the glucose tooltip.
-Selecting a journal row expands the details underneath it. Selecting a chart
-pill uses that same row when it is visible in the list; otherwise, the details
-appear in the separate panel. This covers a hidden or collapsed list and
-entries excluded by the list limit. Selecting the same entry again closes it.
+A journal row is expandable when it has an additional note. Its expanded area
+shows the note without repeating the name, amount or time. Rows without extra
+information are plain text. Selecting a chart pill highlights its visible row
+and opens the note, if present. When the row is hidden, collapsed or excluded
+by the list limit, the separate panel shows the full entry. Selecting the same
+chart pill again clears the selection.
 
 Colored pills show insulin units, carbohydrate grams, or the note label, with
 connector lines to their glucose anchors. Nearby pills are staggered; crowded
@@ -300,7 +302,7 @@ IDs. Refresh the browser after updating the integration's card.
 
 ### Active insulin (eIOB)
 
-With a compatible NG sender, select **Show effective IOB (eIOB)** in the Glucifer destination to send the optional `eiob_u` field. Enable **Active insulin (eIOB)** in the card editor to display it in parentheses beside IOB. If IOB is hidden, active insulin appears on its own. Missing values stay hidden; zero remains a valid value. Update HA to Glucifer 0.5.0 or later before enabling this sender field.
+With a compatible NG sender, select **Show effective IOB (eIOB)** in the Glucifer destination to send the optional `eiob_u` field. Enable **Active insulin (eIOB)** in the card editor to display `IOB: 5.2 U (eIOB: 1.7 U)`. If IOB is hidden, eIOB appears on its own. Missing values stay hidden; zero remains a valid value. Update HA to Glucifer 0.5.0 or later before enabling this sender field.
 
 ### YAML dashboard resources
 

@@ -92,7 +92,8 @@ const path = require('node:path');
   assert.equal(Math.round(Number(await root.locator('circle.journal-marker').getAttribute('cx'))),500);
   await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_journal_symbols=true;card.render();});
   await root.locator('circle.journal-marker').click();
-  assert.match(await root.locator('.journal-selection').textContent(), /25 g/);
+  assert.match(await root.locator('.journal-entry.selected > .journal-entry-label').textContent(), /25 g/);
+  assert.equal(await root.locator('.selection-label').textContent(), '');
   assert.match(await root.locator('.journal-selection').textContent(), /<img src=x/);
   assert.equal(await root.locator('img:not(.brand-logo)').count(),0);
   // Native details remembers the browser's choice across a newly created card.
@@ -199,7 +200,8 @@ const path = require('node:path');
   assert.equal(await root.locator('.glucose').evaluate(el=>el.style.color),'rgb(1, 2, 3)');
   assert.equal(await root.locator('.trend').evaluate(el=>el.style.color),'rgb(4, 5, 6)');
   assert.equal(await root.locator('.history-chart').isVisible(),false);
-  assert.equal(await root.locator('.journal-entry-toggle').count(),1);
+  assert.equal(await root.locator('.journal-entry-toggle').count(),0);
+  assert.equal(await root.locator('.journal-entry-label').count(),1);
   await page.setViewportSize({width:360,height:740});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   // Every sender field has a matching display control, including sensor identity.
@@ -218,7 +220,7 @@ const path = require('node:path');
   assert.match(await root.locator('.lifecycle').textContent(),/Sensorgeneration: 3/);
   assert.match(await root.locator('.lifecycle').textContent(),/Erwartetes Ende: 7\.9\.2026, 01:30/);
   assert.match(await root.locator('.lifecycle').textContent(),/Sensor in Aufwärmphase: Nein/);
-  assert.match(await root.locator('.optional-values').textContent(),/Aktives Insulin: 1,2 E/);
+  assert.match(await root.locator('.optional-values').textContent(),/IOB: 1,2 E/);
   await page.evaluate(()=>{
     const card=document.querySelector('glucifer-card');
     card.config.show_sensor_id=false;card.config.show_sensor_generation=false;card.config.show_iob_u=false;card.render();
@@ -343,11 +345,11 @@ const path = require('node:path');
     window.fixture.states['sensor.eiob']={state:'0.0',attributes:{unit_of_measurement:'U'}};
     card.config.show_eiob_u=true;card.render();
   });
-  assert.match(await root.locator('.optional-values').textContent(),/Insulin on board: .* \(Active: 0.0 U\)/);
+  assert.match(await root.locator('.optional-values').textContent(),/IOB: .* \(eIOB: 0.0 U\)/);
   await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_eiob_u=false;card.render();});
-  assert.doesNotMatch(await root.locator('.optional-values').textContent(),/Active:/);
+  assert.doesNotMatch(await root.locator('.optional-values').textContent(),/eIOB:/);
   await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.config.show_eiob_u=true;window.fixture.states['sensor.eiob'].state='unavailable';card.render();});
-  assert.doesNotMatch(await root.locator('.optional-values').textContent(),/Active:/);
+  assert.doesNotMatch(await root.locator('.optional-values').textContent(),/eIOB:/);
   // Font size is honored on a normal card, with independently styled local text.
   await page.setViewportSize({width:528,height:1000});
   await page.evaluate(()=>{
@@ -367,7 +369,7 @@ const path = require('node:path');
   });
   assert.equal(await root.locator('.glucose').textContent(),'7,5 mmol/L');
   assert.match(await root.locator('.delta').textContent(),/1,2/);
-  assert.match(await root.locator('.optional-values').textContent(),/Aktives Insulin: 1,2 E/);
+  assert.match(await root.locator('.optional-values').textContent(),/IOB: 1,2 E/);
   assert.match(await page.evaluate(()=>document.querySelector('glucifer-card').formatDateTime('2026-09-06T12:00:00Z')),/6\.9\.2026, 12:00/);
   await page.evaluate(()=>{const card=document.querySelector('glucifer-card');card.setConfig({...card.config,locale:'en-US'});});
   assert.equal(await root.locator('.glucose').textContent(),'7.5 mmol/L');
