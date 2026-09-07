@@ -12,6 +12,13 @@ const GLUCIFER_FIELDS = {
 const GLUCIFER_HISTORY_CACHE = new WeakMap();
 const GLUCIFER_HISTORY_CACHE_MS = 300000;
 const GLUCIFER_DE = {
+  "Alert history": "Alarmverlauf", "Show alert history": "Alarmverlauf anzeigen",
+  "Alert history entries": "Einträge im Alarmverlauf", "No alert events received yet": "Noch keine Alarmereignisse empfangen",
+  "Fired": "Ausgelöst", "Acknowledged": "Bestätigt", "Snoozed": "Stummgeschaltet", "Cleared": "Beendet",
+  "Snoozed until {time}": "Stummgeschaltet bis {time}",
+  "Waiting for the first snapshot": "Warten auf die ersten Daten",
+  "Snapshot is stale; recent contact was not a fresh update": "Daten sind veraltet; der letzte Kontakt enthielt keine aktuellen Daten",
+
   "Show prediction curves": "Prognosekurven anzeigen",
   "Prediction (raw)": "Prognose (Rohwerte)",
   "Prediction (auto)": "Prognose (Auto)",
@@ -134,6 +141,7 @@ const GLUCIFER_SENSOR_FIELDS = Object.keys(GLUCIFER_FIELDS).filter(key => key.st
 const GLUCIFER_DEFAULTS = {
   ...Object.fromEntries(Object.keys(GLUCIFER_FIELDS).map(key => [`show_${key}`, true])),
   show_reading_age: true, show_glucose_unit: true, show_logo: true, arrow_size: 84, arrow_length: null, arrow_width: null, arrow_position: "glucose", glucose_size: 42, glucose_weight: 600, glucose_style: "normal", glucose_font: "", locale: "", glucose_alignment: "left", show_eiob_u: false,
+  show_alert_history: false, alert_history_limit: 20,
   hours: 24, show_history: true, show_details: true, show_alerts: true, show_lifecycle: true,
   show_predictions: false, show_journal: false, journal_compact: true, show_journal_markers: true, show_journal_symbols: false, journal_days: 7, journal_limit: 25,
   journal_types: ["insulin", "carbs", "note"], color_glucose: true, color_trend: true,
@@ -145,7 +153,7 @@ const GLUCIFER_DEFAULTS = {
 };
 function gluciferConfig(config) {
   const result = {...GLUCIFER_DEFAULTS, ...config};
-  for (const [key,min,max] of [["glucose_weight",100,900],["hours",1,168],["arrow_size",24,160],["glucose_size",24,96],["journal_days",1,90],["journal_limit",1,200],
+  for (const [key,min,max] of [["alert_history_limit",1,100],["glucose_weight",100,900],["hours",1,168],["arrow_size",24,160],["glucose_size",24,96],["journal_days",1,90],["journal_limit",1,200],
     ["very_low",1,1000],["low",1,1000],["high",1,1000],["very_high",1,1000]]) {
     const value = config[key] == null || config[key] === "" ? GLUCIFER_DEFAULTS[key] : Number(config[key]);
     if (!Number.isFinite(value) || value < min || value > max) throw new Error(`${key.replaceAll("_", " ")} must be between ${min} and ${max}.`);
@@ -213,7 +221,7 @@ function gluciferForm(language = "en") {
         field("glucose_font","Glucose font family",{text:{}}),
         number("arrow_length","Arrow length (px)",24,240), number("arrow_width","Arrow stroke width (px)",1,16),
         {...field("glucose_alignment","Glucose alignment",{select:{options:[{value:"left",label:"Left"},{value:"center",label:"Center"}]}}),default:"left"},{...number("arrow_size","Arrow size (px)",24,160),default:84},
-        {...field("arrow_position","Arrow position",{select:{options:[{value:"glucose",label:"Beside glucose"},{value:"details",label:"Lower, beside delta and IOB"}]}}),default:"glucose"},toggle("show_logo","Show logo"),toggle("show_history","Glucose chart"),toggle("show_predictions","Show prediction curves"),toggle("show_glucose_unit","Show glucose unit"),toggle("show_reading_age","Reading age"),toggle("show_alerts","Active alerts")]),
+        {...field("arrow_position","Arrow position",{select:{options:[{value:"glucose",label:"Beside glucose"},{value:"details",label:"Lower, beside delta and IOB"}]}}),default:"glucose"},toggle("show_logo","Show logo"),toggle("show_history","Glucose chart"),toggle("show_predictions","Show prediction curves"),toggle("show_glucose_unit","Show glucose unit"),toggle("show_reading_age","Reading age"),toggle("show_alerts","Active alerts"),toggle("show_alert_history","Show alert history"),field("alert_history_limit","Alert history entries",{number:{min:1,max:100,mode:"slider"}})]),
       panel("values","Glucose and phone data",Object.entries(GLUCIFER_FIELDS).filter(([key]) => !key.startsWith("sensor_")).map(([key,label]) => toggle(`show_${key}`,label))),
       panel("sensor","Sensor data",GLUCIFER_SENSOR_FIELDS.map(key => toggle(`show_${key}`,GLUCIFER_FIELDS[key]))),
       panel("journal","Journal",[toggle("show_journal_markers","Show journal pills on chart"),toggle("show_journal_symbols","Show chart marker symbols and legend"),toggle("show_journal","Show journal history list"),toggle("journal_compact","Compact journal list"),
@@ -456,7 +464,7 @@ class GluciferCard extends HTMLElement {
     </style><ha-card><div class="title-row"><h2></h2><img class="brand-logo" alt="Glucifer" width="32" height="32"></div><div class="reading"><div class="glucose"></div><span class="trend"></span></div><div class="details-row"><div class="details-copy"><div class="detail summary"><span class="delta"></span><span class="reading-age"></span></div><div class="detail optional-values"></div></div></div>
       <div class="warning health"></div><div class="native-chart" hidden></div><svg class="history-chart" viewBox="0 0 600 180" role="img" aria-label="Glucose history"><path></path><g class="journal-markers"></g></svg>
       <div class="axis"><span class="start"></span><span class="range"></span><span class="end"></span></div>
-      <div class="detail journal-legend" hidden>▲ Insulin · ● Carbohydrates · ■ Note</div><div class="detail history"></div><div class="journal-selection" hidden><div class="selection-label"></div><div class="selection-note"></div><button>Close</button></div><details class="journal-section" hidden><summary><span class="journal-title"></span><span class="journal-summary-count"></span></summary><div class="journal-count detail"></div><div class="journal-list"></div></details><ul></ul><div class="detail lifecycle"></div><button>More details</button></ha-card>`;
+      <div class="detail journal-legend" hidden>▲ Insulin · ● Carbohydrates · ■ Note</div><div class="detail history"></div><div class="journal-selection" hidden><div class="selection-label"></div><div class="selection-note"></div><button>Close</button></div><details class="journal-section" hidden><summary><span class="journal-title"></span><span class="journal-summary-count"></span></summary><div class="journal-count detail"></div><div class="journal-list"></div></details><ul></ul><details class="alert-history" hidden><summary></summary><div class="alert-history-list detail"></div></details><div class="detail lifecycle"></div><button>More details</button></ha-card>`;
     const root = this.shadowRoot;
     const text = (selector, value) => { root.querySelector(selector).textContent = value; };
     root.querySelector("ha-card").lang = this.config.locale || this._hass.locale?.language || "en";
@@ -530,6 +538,28 @@ class GluciferCard extends HTMLElement {
       ? `Δ ${this.formatNumber(Number(delta.state), 1, 1)} ${delta.attributes.unit_of_measurement}` : "");
     this.updateAge();
     text(".health", state("connected")?.state === "off" ? this.t("Phone has not contacted Home Assistant recently") : state("stale")?.state === "on" ? this.t("Glucose reading is stale") : "");
+    const connectionReason = state("connection_status")?.state;
+    const healthMessages = {waiting_for_first_snapshot:"Waiting for the first snapshot",sender_timeout:"Phone has not contacted Home Assistant recently",
+      snapshot_stale:"Snapshot is stale; recent contact was not a fresh update",glucose_stale:"Glucose reading is stale"};
+    if (healthMessages[connectionReason]) text(".health", this.t(healthMessages[connectionReason]));
+    const alertSection = root.querySelector(".alert-history");
+    alertSection.hidden = !this.config.show_alert_history;
+    text(".alert-history summary", this.t("Alert history"));
+    const alertHistory = (this.data?.alert_history || []).slice(-this.config.alert_history_limit).reverse();
+    const alertSignature = JSON.stringify([alertHistory, this.config.locale, this._hass.locale, this._hass.config?.time_zone]);
+    if (alertSignature !== this.alertHistorySignature) {
+      this.alertHistorySignature = alertSignature;
+      const list = root.querySelector(".alert-history-list"); list.replaceChildren();
+      for (const event of alertHistory) {
+        const row = document.createElement("div");
+        const label = state(`alert_${event.alert}`)?.attributes.friendly_name || event.alert.replaceAll("_", " ");
+        const reason = ({fired:"Fired",acknowledged:"Acknowledged",snoozed:"Snoozed",cleared:"Cleared"})[event.reason] || event.reason;
+        row.textContent = `${this.formatDateTime(event.time_ms, false, true)} · ${label} · ${this.t(reason)}`;
+        if (event.snoozed_until_ms) row.textContent += ` (${this.t("Snoozed until {time}", {time:this.formatDateTime(event.snoozed_until_ms)})})`;
+        list.append(row);
+      }
+      if (!alertHistory.length) list.textContent = this.t("No alert events received yet");
+    }
     const historySignature = JSON.stringify([this.data?.readings, this.data?.predictions, this.data?.journal, this.data?.journal_enabled, this.data?.journal_history_days,
       this.config, unit, this._hass.locale, this._hass.config?.time_zone, this.error, this._hass.themes?.darkMode, Boolean(customElements.get("ha-chart-base")), Math.floor(Date.now()/60000)]);
     if (historySignature !== this.historySignature) {
@@ -850,7 +880,7 @@ class GluciferCard extends HTMLElement {
     const locale = this.config.locale || (ha.number_format === "system" ? undefined : formats[ha.number_format] || ha.language);
     return new Intl.NumberFormat(locale, {maximumFractionDigits, minimumFractionDigits, useGrouping:this.config.locale ? true : ha.number_format !== "none"}).format(value);
   }
-  formatDateTime(value, timeOnly = false) {
+  formatDateTime(value, timeOnly = false, seconds = false) {
     const date = new Date(value);
     if (!Number.isFinite(date.getTime())) return this.t("Unavailable");
     const locale = this.config.locale ? {...this._hass?.locale, language:this.config.locale, date_format:"language", time_format:"language"} : this._hass?.locale || {};
@@ -858,7 +888,7 @@ class GluciferCard extends HTMLElement {
     const timeLocale = locale.time_format === "system" ? undefined : locale.language;
     const hour12 = locale.time_format === "12" ? true : locale.time_format === "24" ? false
       : new Intl.DateTimeFormat(timeLocale, {hour:"numeric"}).resolvedOptions().hour12;
-    const time = new Intl.DateTimeFormat(timeLocale, {hour:hour12 ? "numeric" : "2-digit", minute:"2-digit", hourCycle:hour12 ? "h12" : "h23", timeZone}).format(date);
+    const time = new Intl.DateTimeFormat(timeLocale, {hour:hour12 ? "numeric" : "2-digit", minute:"2-digit", ...(seconds ? {second:"2-digit"} : {}), hourCycle:hour12 ? "h12" : "h23", timeZone}).format(date);
     if (timeOnly) return time;
     const formatter = new Intl.DateTimeFormat(locale.date_format === "system" ? undefined : locale.language, {year:"numeric",month:"numeric",day:"numeric",timeZone});
     const order = {DMY:["day","month","year"],MDY:["month","day","year"],YMD:["year","month","day"]}[locale.date_format];

@@ -214,3 +214,36 @@ def test_invalid_prediction_curves(snapshot, case):
     snapshot["predictions"] = curves
     with pytest.raises(InvalidSnapshot, match="invalid_predictions"):
         validate_snapshot(snapshot, snapshot["sent_at_ms"])
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda p: p.update(
+            alert_events=[
+                {"id": "x", "alert": "high", "reason": "invented", "time_ms": p["sent_at_ms"]}
+            ]
+        ),
+        lambda p: p.update(
+            alert_details={
+                "high": {
+                    "id": "x",
+                    "alert": "high",
+                    "reason": "acknowledged",
+                    "time_ms": p["sent_at_ms"],
+                }
+            }
+        ),
+        lambda p: p.update(
+            alert_events=[
+                {"id": "x", "alert": "high", "reason": "snoozed", "time_ms": p["sent_at_ms"]}
+            ]
+        ),
+        lambda p: p.update(reporting={"background_interval_seconds": True, "live_bypass": True}),
+        lambda p: p.update(reporting={"background_interval_seconds": 3600, "live_bypass": "true"}),
+    ],
+)
+def test_reject_invalid_alert_metadata(snapshot, mutation):
+    mutation(snapshot)
+    with pytest.raises(InvalidSnapshot):
+        validate_snapshot(snapshot, snapshot["sent_at_ms"])

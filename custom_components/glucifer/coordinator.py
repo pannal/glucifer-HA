@@ -4,6 +4,7 @@
 import asyncio
 import logging
 from datetime import timedelta
+from statistics import median
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
@@ -11,7 +12,8 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-from .const import DEFAULT_STALE_SECONDS, DOMAIN, HISTORY_DAYS, MAX_HISTORY_POINTS
+from .alerts import merge_events, validate_change
+from .const import ALERTS, DEFAULT_STALE_SECONDS, DOMAIN, HISTORY_DAYS, MAX_HISTORY_POINTS
 from .journal import apply_journal, empty_journal, restore_journal, validate_journal
 from .protocol import (
     InvalidSnapshot,
@@ -35,6 +37,13 @@ class JugglucoCoordinator(DataUpdateCoordinator):
         self.data = None
         self.history = []
         self.journal = empty_journal()
+        self.alert_history = []
+        self.known_alerts = set()
+        self.new_alert_events = []
+        self.reading_intervals = []
+        self.test_state = "off"
+        self.test_reason = "idle"
+        self.test_cancel = None
         self.revision = 0
         self.last_contact_ms = None
         self.backfill_active = None
@@ -47,11 +56,28 @@ class JugglucoCoordinator(DataUpdateCoordinator):
             try:
                 # Version 0.1 saved the snapshot directly.
                 self.data = validate_snapshot(saved.get("snapshot", saved), self.now_ms)
+                self.known_alerts = set(saved.get("known_alerts", [])) & ALERTS.keys()
+                self.known_alerts.update(self.data["alerts"])
                 contact = saved.get("last_contact_ms")
                 if type(contact) is int and 0 < contact <= self.now_ms + 120000:
                     self.last_contact_ms = contact
                 if type(saved.get("backfill_active")) is bool:
                     self.backfill_active = saved["backfill_active"]
+                try:
+                    events = saved.get("alert_history", [])
+                    if not isinstance(events, list) or len(events) > 256:
+                        raise InvalidSnapshot("invalid_alert_history")
+                    self.alert_history, _ = merge_events(
+                        [], [validate_change(event, self.now_ms) for event in events], self.now_ms
+                    )
+                    intervals = saved.get("reading_intervals", [])
+                    if isinstance(intervals, list):
+                        self.reading_intervals = [
+                            v for v in intervals[-8:] if type(v) is int and 1 <= v <= 900
+                        ]
+                except InvalidSnapshot, TypeError, KeyError:
+                    LOGGER.warning("Ignoring invalid saved Glucifer alert history")
+                    self.alert_history = []
                 points = saved.get("history", [])
                 # Apply the same validation to saved history in bounded chunks.
                 validated = []
@@ -82,6 +108,7 @@ class JugglucoCoordinator(DataUpdateCoordinator):
                 self.history = []
                 self.journal = empty_journal()
                 self.last_contact_ms = None
+        self.entry.async_on_unload(self.cancel_test)
         self.entry.async_on_unload(
             async_track_time_interval(self.hass, self._tick, timedelta(seconds=15))
         )
@@ -105,8 +132,53 @@ class JugglucoCoordinator(DataUpdateCoordinator):
         stamp = self.data["glucose"]["time_ms"] if glucose else self.data["sent_at_ms"]
         return -120000 <= self.now_ms - stamp <= limit and (glucose is False or self.fresh())
 
+    def availability_reason(self, *, glucose=False, alert=None):
+        if self.data is None:
+            return "waiting_for_first_snapshot"
+        if alert is not None:
+            if alert not in self.data["alerts"]:
+                return "field_disabled"
+            if self.data["alerts"][alert] is None:
+                return "alert_state_unknown"
+        if not self.connected:
+            return "sender_timeout"
+        if not self.fresh():
+            return "snapshot_stale"
+        if glucose and not self.fresh(glucose=True):
+            return "glucose_stale"
+        return "current"
+
+    @property
+    def observed_interval_seconds(self):
+        return round(median(self.reading_intervals)) if len(self.reading_intervals) >= 3 else None
+
+    @callback
+    def cancel_test(self):
+        if self.test_cancel:
+            self.test_cancel()
+            self.test_cancel = None
+
+    @callback
+    def set_test(self, phase, seconds=60):
+        from homeassistant.helpers.event import async_call_later
+
+        self.cancel_test()
+        self.test_state = {"fired": "on", "connection_lost": "unavailable"}.get(phase, "off")
+        self.test_reason = phase
+        if phase in {"fired", "connection_lost"}:
+            self.test_cancel = async_call_later(self.hass, seconds, self._expire_test)
+        self.async_update_listeners()
+
+    @callback
+    def _expire_test(self, _now):
+        self.set_test("expired")
+
     @callback
     def _tick(self, _now):
+        events, _ = merge_events(self.alert_history, [], self.now_ms)
+        if events != self.alert_history:
+            self.alert_history = events
+            self.revision += 1
         self.async_update_listeners()
 
     def merge_history(self, current, incoming):
@@ -118,10 +190,24 @@ class JugglucoCoordinator(DataUpdateCoordinator):
                 points.setdefault(point["time_ms"], point)
         return [points[key] for key in sorted(points)[-MAX_HISTORY_POINTS:]]
 
-    async def _save(self, snapshot, history, contact, backfill_active=None, journal=None):
+    async def _save(
+        self,
+        snapshot,
+        history,
+        contact,
+        backfill_active=None,
+        journal=None,
+        alert_history=None,
+        reading_intervals=None,
+    ):
         await self.store.async_save(
             {
                 "snapshot": snapshot,
+                "known_alerts": sorted(self.known_alerts | snapshot["alerts"].keys()),
+                "alert_history": self.alert_history if alert_history is None else alert_history,
+                "reading_intervals": self.reading_intervals
+                if reading_intervals is None
+                else reading_intervals,
                 "journal": self.journal if journal is None else journal,
                 "history": history,
                 "last_contact_ms": contact,
@@ -148,11 +234,27 @@ class JugglucoCoordinator(DataUpdateCoordinator):
                 else self.history
             )
             contact = self.now_ms
-            await self._save(snapshot, history, contact)
+            events, new_events = merge_events(
+                self.alert_history,
+                incoming.get("alert_events", []) if status == "accepted" else [],
+                contact,
+            )
+            intervals = self.reading_intervals.copy()
+            if status == "accepted" and self.data:
+                delta = (incoming["glucose"]["time_ms"] - self.data["glucose"]["time_ms"]) // 1000
+                if 1 <= delta <= 900:
+                    intervals = (intervals + [delta])[-8:]
+            await self._save(
+                snapshot, history, contact, alert_history=events, reading_intervals=intervals
+            )
+            self.known_alerts.update(snapshot["alerts"])
+            self.alert_history, self.reading_intervals = events, intervals
+            self.new_alert_events = new_events
             self.history, self.last_contact_ms = history, contact
             if status == "accepted":
                 self.revision += 1
             self.async_set_updated_data(snapshot)
+            self.new_alert_events = []
             return {
                 "schema_version": incoming["schema_version"],
                 "source_id": incoming["source_id"],

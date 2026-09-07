@@ -691,3 +691,195 @@ async def test_predictions_survive_reload_and_never_enter_measurement_history(
     data = (await ws.receive_json())["result"]
     assert data["predictions"] == []
     assert data["readings"] == [snapshot["glucose"]]
+
+
+def alert_change(snapshot, reason, identifier, offset=0, **extra):
+    return {
+        "id": identifier,
+        "alert": "high",
+        "reason": reason,
+        "time_ms": snapshot["sent_at_ms"] + offset,
+        **extra,
+    }
+
+
+async def test_alert_timeline_quick_ack_retry_and_reload(hass, receiver, snapshot):
+    entry, client = receiver
+    fired = alert_change(snapshot, "fired", "event-1", -8000)
+    ack = alert_change(snapshot, "acknowledged", "event-2")
+    snapshot["alerts"]["high"] = False
+    snapshot["alert_details"] = {"high": ack}
+    snapshot["alert_events"] = [fired, ack]
+    received = []
+    hass.bus.async_listen(
+        "state_changed",
+        lambda event: (
+            received.append(event.data)
+            if event.data["entity_id"] == "event.phone_alert_activity"
+            else None
+        ),
+    )
+    assert (await send(hass, client, snapshot)).status == 200
+    assert hass.states.get("binary_sensor.phone_high_glucose_alert").state == "off"
+    assert [event["new_state"].attributes.get("event_type") for event in received] == [
+        "fired",
+        "acknowledged",
+    ]
+    assert entry.runtime_data.alert_history == [fired, ack]
+    assert (
+        hass.states.get("binary_sensor.phone_high_glucose_alert").attributes["reason"]
+        == "acknowledged"
+    )
+    received.clear()
+    await send(hass, client, snapshot)
+    assert received == []
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.runtime_data.alert_history == [fired, ack]
+    received.clear()
+    snapshot["sequence"] += 1
+    await send(hass, client, snapshot)
+    assert received == []  # No replay, including a newer snapshot with the same event buffer.
+
+
+async def test_alert_metadata_storage_failure_does_not_publish(hass, receiver, snapshot):
+    entry, client = receiver
+    snapshot["alert_events"] = [alert_change(snapshot, "fired", "event-1")]
+    with patch.object(entry.runtime_data.store, "async_save", side_effect=OSError):
+        assert (await send(hass, client, snapshot)).status == 503
+    assert entry.runtime_data.alert_history == []
+    assert hass.states.get("event.phone_alert_activity").state == "unknown"
+
+
+async def test_explained_freshness_and_observed_cadence(hass, receiver, snapshot, freezer):
+    entry, client = receiver
+    assert hass.states.get("sensor.phone_connection_status").state == "waiting_for_first_snapshot"
+    snapshot["reporting"] = {"background_interval_seconds": 3600, "live_bypass": True}
+    for _ in range(4):
+        await send(hass, client, snapshot)
+        freezer.tick(timedelta(seconds=60))
+        snapshot["sequence"] += 1
+        snapshot["sent_at_ms"] += 60000
+        snapshot["glucose"]["time_ms"] += 60000
+    assert hass.states.get("sensor.phone_observed_reading_interval").state == "60"
+    assert hass.states.get("sensor.phone_background_sending_interval").state == "3600"
+    freezer.tick(timedelta(seconds=301))
+    async_fire_time_changed(hass, dt_util.utcnow())
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.phone_connection_status").state == "sender_timeout"
+    # History/contact traffic does not refresh alert snapshots.
+    entry.runtime_data.last_contact_ms = entry.runtime_data.now_ms
+    entry.runtime_data.async_update_listeners()
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.phone_alert_data_status").state == "snapshot_stale"
+    snapshot["sent_at_ms"] = entry.runtime_data.now_ms
+    await send(hass, client, snapshot)
+    assert hass.states.get("sensor.phone_connection_status").state == "glucose_stale"
+    assert hass.states.get("sensor.phone_alert_data_status").state == "current"
+    snapshot["sequence"] += 1
+    snapshot["alerts"]["high"] = None
+    await send(hass, client, snapshot)
+    assert (
+        hass.states.get("sensor.phone_alert_data_status").attributes["alerts"]["high"]
+        == "alert_state_unknown"
+    )
+    snapshot["sequence"] += 1
+    snapshot["alerts"].pop("high")
+    await send(hass, client, snapshot)
+    assert (
+        hass.states.get("sensor.phone_alert_data_status").attributes["alerts"]["high"]
+        == "field_disabled"
+    )
+
+
+async def test_isolated_test_controls_timeout_and_reload(hass, receiver, snapshot, freezer):
+    entry, client = receiver
+    await send(hass, client, snapshot)
+    data = deepcopy(entry.runtime_data.data)
+    history = deepcopy(entry.runtime_data.history)
+    contact = entry.runtime_data.last_contact_ms
+    await hass.services.async_call(
+        "button", "press", {"entity_id": "button.phone_start_test_alert"}, blocking=True
+    )
+    assert hass.states.get("binary_sensor.phone_test_alert").state == "on"
+    assert hass.states.get("binary_sensor.phone_test_alert").attributes["test"] is True
+    await hass.services.async_call(
+        "button", "press", {"entity_id": "button.phone_acknowledge_test_alert"}, blocking=True
+    )
+    assert hass.states.get("binary_sensor.phone_test_alert").state == "off"
+    assert hass.states.get("binary_sensor.phone_test_alert").attributes["reason"] == "acknowledged"
+    await hass.services.async_call(
+        "glucifer",
+        "test_alert",
+        {"config_entry_id": entry.entry_id, "phase": "connection_lost", "duration_seconds": 10},
+        blocking=True,
+    )
+    assert hass.states.get("binary_sensor.phone_test_alert").state == "unavailable"
+    freezer.tick(timedelta(seconds=11))
+    async_fire_time_changed(hass, dt_util.utcnow())
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.phone_test_alert").state == "off"
+    assert entry.runtime_data.data == data
+    assert entry.runtime_data.history == history
+    assert entry.runtime_data.last_contact_ms == contact
+    assert entry.runtime_data.alert_history == []
+    await hass.services.async_call(
+        "button", "press", {"entity_id": "button.phone_start_test_alert"}, blocking=True
+    )
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.phone_test_alert").state == "off"
+    assert entry.runtime_data.data == data
+
+
+async def test_alert_event_conflict_and_legacy_sender(hass, receiver, snapshot):
+    entry, client = receiver
+    fired = alert_change(snapshot, "fired", "event-1")
+    snapshot["alert_events"] = [fired]
+    snapshot["alert_details"] = {"high": fired}
+    await send(hass, client, snapshot)
+    snapshot["sequence"] += 1
+    snapshot["alert_events"][0]["reason"] = "acknowledged"
+    assert (await send(hass, client, snapshot)).status == 422
+    assert entry.runtime_data.alert_history[0]["reason"] == "fired"
+    snapshot.pop("alert_events")
+    snapshot.pop("alert_details")
+    await send(hass, client, snapshot)
+    assert hass.states.get("binary_sensor.phone_high_glucose_alert").state == "on"
+    assert hass.states.get("binary_sensor.phone_high_glucose_alert").attributes["reason"] is None
+    assert len(entry.runtime_data.alert_history) == 1
+
+
+async def test_test_service_rejects_wrong_receiver_and_duration(hass, receiver):
+    import voluptuous as vol
+    from homeassistant.exceptions import ServiceValidationError
+
+    entry, _ = receiver
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            "glucifer",
+            "test_alert",
+            {"config_entry_id": "missing", "phase": "fired"},
+            blocking=True,
+        )
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            "glucifer",
+            "test_alert",
+            {"config_entry_id": entry.entry_id, "phase": "fired", "duration_seconds": 301},
+            blocking=True,
+        )
+    assert entry.runtime_data.test_state == "off"
+
+
+async def test_alert_timeline_expires_without_another_push(hass, receiver, snapshot, freezer):
+    entry, client = receiver
+    snapshot["alert_events"] = [alert_change(snapshot, "fired", "event-1")]
+    await send(hass, client, snapshot)
+    assert len(entry.runtime_data.alert_history) == 1
+    revision = entry.runtime_data.revision
+    freezer.tick(timedelta(days=7, seconds=1))
+    async_fire_time_changed(hass, dt_util.utcnow())
+    await hass.async_block_till_done()
+    assert entry.runtime_data.alert_history == []
+    assert entry.runtime_data.revision > revision

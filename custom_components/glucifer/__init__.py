@@ -17,11 +17,14 @@ async def async_setup(hass, config):
     from .api import async_register
 
     await async_register(hass)
+    from .testing import async_register_test_service
+
+    async_register_test_service(hass)
     return True
 
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.EVENT, Platform.BUTTON]
 
 
 async def async_setup_entry(hass, entry):

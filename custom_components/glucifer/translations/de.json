@@ -1,0 +1,70 @@
+{
+  "entity": {
+    "sensor": {
+      "connection_status": {
+        "name": "Verbindungsstatus",
+        "state": {
+          "waiting_for_first_snapshot": "Warten auf erste Daten",
+          "sender_timeout": "Telefon meldet sich nicht",
+          "snapshot_stale": "Übertragene Daten veraltet",
+          "glucose_stale": "Glukose veraltet",
+          "current": "Aktuell",
+          "fields_disabled": "Alarme deaktiviert",
+          "alert_state_unknown": "Einige Alarmzustände unbekannt"
+        }
+      },
+      "alert_status": {
+        "name": "Status der Alarmdaten",
+        "state": {
+          "waiting_for_first_snapshot": "Warten auf erste Daten",
+          "sender_timeout": "Telefon meldet sich nicht",
+          "snapshot_stale": "Übertragene Daten veraltet",
+          "glucose_stale": "Glukose veraltet",
+          "current": "Aktuell",
+          "fields_disabled": "Alarme deaktiviert",
+          "alert_state_unknown": "Einige Alarmzustände unbekannt"
+        }
+      },
+      "snapshot_age": {
+        "name": "Alter der übertragenen Daten"
+      },
+      "observed_interval": {
+        "name": "Beobachteter Messabstand"
+      },
+      "background_interval": {
+        "name": "Sendeintervall im Hintergrund"
+      }
+    },
+    "binary_sensor": {
+      "test_alert": {
+        "name": "Testalarm"
+      }
+    },
+    "button": {
+      "test_fired": {
+        "name": "Testalarm starten"
+      },
+      "test_acknowledged": {
+        "name": "Testalarm bestätigen"
+      },
+      "test_connection_lost": {
+        "name": "Verbindungsausfall testen"
+      }
+    },
+    "event": {
+      "alert_activity": {
+        "name": "Alarmaktivität",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "fired": "Ausgelöst",
+              "acknowledged": "Bestätigt",
+              "snoozed": "Stummgeschaltet",
+              "cleared": "Beendet"
+            }
+          }
+        }
+      }
+    }
+  }
+}

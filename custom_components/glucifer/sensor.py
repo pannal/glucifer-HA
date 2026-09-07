@@ -46,6 +46,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
         [
             JugglucoDiagnostic(coordinator, key, name, unit, kind)
             for key, name, unit, kind in [
+                ("connection_status", "Connection status", None, "text"),
+                ("alert_status", "Alert data status", None, "text"),
+                ("snapshot_age", "Snapshot age", "s", "number"),
+                ("observed_interval", "Observed reading interval", "s", "number"),
+                ("background_interval", "Background sending interval", "s", "number"),
                 ("last_contact", "Last contact", None, "timestamp"),
                 ("reading_age", "Reading age", "s", "number"),
                 ("history_count", "Stored history readings", None, "number"),
@@ -124,6 +129,26 @@ class JugglucoDiagnostic(JugglucoSensor):
     def __init__(self, *args):
         super().__init__(*args)
         self._attr_state_class = None
+        if self.key in {
+            "connection_status",
+            "alert_status",
+            "snapshot_age",
+            "observed_interval",
+            "background_interval",
+        }:
+            self._attr_translation_key = self.key
+            del self._attr_name
+        if self.key in {"connection_status", "alert_status"}:
+            self._attr_device_class = SensorDeviceClass.ENUM
+            self._attr_options = [
+                "waiting_for_first_snapshot",
+                "sender_timeout",
+                "snapshot_stale",
+                "glucose_stale",
+                "current",
+                "fields_disabled",
+                "alert_state_unknown",
+            ]
 
     @property
     def available(self):
@@ -132,6 +157,26 @@ class JugglucoDiagnostic(JugglucoSensor):
     @property
     def native_value(self):
         coordinator = self.coordinator
+        if self.key == "connection_status":
+            return coordinator.availability_reason(glucose=True)
+        if self.key == "alert_status":
+            reason = coordinator.availability_reason()
+            if reason != "current":
+                return reason
+            alerts = coordinator.data["alerts"]
+            if not alerts:
+                return "fields_disabled"
+            return "alert_state_unknown" if any(v is None for v in alerts.values()) else "current"
+        if self.key == "snapshot_age":
+            return (
+                max(0, (coordinator.now_ms - coordinator.data["sent_at_ms"]) // 1000)
+                if coordinator.data
+                else None
+            )
+        if self.key == "observed_interval":
+            return coordinator.observed_interval_seconds
+        if self.key == "background_interval":
+            return (coordinator.data or {}).get("reporting", {}).get("background_interval_seconds")
         if self.key == "last_contact":
             return (
                 datetime.fromtimestamp(coordinator.last_contact_ms / 1000, UTC)
@@ -145,3 +190,18 @@ class JugglucoDiagnostic(JugglucoSensor):
                 else None
             )
         return len(coordinator.history)
+
+    @property
+    def extra_state_attributes(self):
+        if self.key in {"connection_status", "alert_status"}:
+            return {
+                "alerts": {
+                    key: self.coordinator.availability_reason(alert=key)
+                    for key in sorted(self.coordinator.known_alerts)
+                },
+                "stale_after_seconds": self.coordinator.entry.options.get("stale_seconds", 300),
+                "live_events_bypass_interval": (self.coordinator.data or {})
+                .get("reporting", {})
+                .get("live_bypass"),
+            }
+        return None

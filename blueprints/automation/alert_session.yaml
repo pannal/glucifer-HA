@@ -1,0 +1,146 @@
+blueprint:
+  name: Glucifer alert start and stop
+  description: >-
+    Start lights or sound while any selected alert is on, then run cleanup when
+    all are off. If the last active alert becomes unavailable, use separate
+    connection-loss actions. An acknowledgement of one alert does not stop another.
+    Quiet hours are off by default. Include a receiver's Test alert sensor to
+    exercise this automation with its test buttons. Use short actions here;
+    repeating sound belongs in Repeat actions. This is not medical monitoring.
+  domain: automation
+  input:
+    alert_entities:
+      name: Alerts
+      description: Select the alerts that share these lights/speakers. Optionally include Test alert.
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - integration: glucifer
+              domain: binary_sensor
+    start_actions:
+      name: Start actions
+      default: []
+      selector:
+        action: {}
+    repeat_actions:
+      name: Repeat actions
+      description: Optional short sound or notification while any selected alert remains on.
+      default: []
+      selector:
+        action: {}
+    repeat_seconds:
+      name: Repeat interval
+      description: Zero disables repetition. Acknowledgement interrupts the wait immediately.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 300
+          unit_of_measurement: s
+          mode: slider
+    stop_actions:
+      name: Cleanup actions
+      description: Stop sound or notifications after the session ends, including connection loss.
+      default: []
+      selector:
+        action: {}
+    clear_actions:
+      name: Acknowledged or cleared actions
+      description: Run only when every selected alert is explicitly off.
+      default: []
+      selector:
+        action: {}
+    lost_actions:
+      name: Connection-loss actions
+      description: Run if no alert is on and at least one is unknown or unavailable. This is not acknowledgement.
+      default: []
+      selector:
+        action: {}
+    restore_lights:
+      name: Lights to restore
+      description: Optionally remember these lights before starting and restore them after cleanup.
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: light
+    quiet_enabled:
+      name: Enable quiet hours
+      default: false
+      selector:
+        boolean: {}
+    quiet_start:
+      name: Quiet hours start
+      default: '22:00:00'
+      selector:
+        time: {}
+    quiet_end:
+      name: Quiet hours end
+      default: '07:00:00'
+      selector:
+        time: {}
+trigger_variables:
+  selected_alerts: !input alert_entities
+triggers:
+  - trigger: template
+    value_template: "{{ expand(selected_alerts) | selectattr('state', 'eq', 'on') | list | count > 0 }}"
+  - trigger: homeassistant
+    event: start
+variables:
+  selected_alerts: !input alert_entities
+  lights: !input restore_lights
+  interval: !input repeat_seconds
+  quiet_enabled: !input quiet_enabled
+  quiet_start: !input quiet_start
+  quiet_end: !input quiet_end
+  scene_id: "{{ 'glucifer_' ~ this.entity_id.split('.')[1] }}"
+conditions:
+  - condition: template
+    value_template: "{{ expand(selected_alerts) | selectattr('state', 'eq', 'on') | list | count > 0 }}"
+  - condition: template
+    value_template: >-
+      {% set t = now().strftime('%H:%M:%S') %}
+      {{ not quiet_enabled or quiet_start == quiet_end or
+         (not (quiet_start <= t < quiet_end) if quiet_start < quiet_end
+          else not (t >= quiet_start or t < quiet_end)) }}
+actions:
+  - if: "{{ lights | count > 0 }}"
+    then:
+      - action: scene.create
+        data:
+          scene_id: "{{ scene_id }}"
+          snapshot_entities: "{{ lights }}"
+  - sequence: !input start_actions
+    continue_on_error: true
+  - repeat:
+      while:
+        - condition: template
+          value_template: "{{ expand(selected_alerts) | selectattr('state', 'eq', 'on') | list | count > 0 }}"
+      sequence:
+        - wait_template: "{{ expand(selected_alerts) | selectattr('state', 'eq', 'on') | list | count == 0 }}"
+          timeout:
+            seconds: "{{ interval if interval > 0 else 86400 }}"
+        - if: "{{ not wait.completed and interval > 0 and expand(selected_alerts) | selectattr('state', 'eq', 'on') | list | count > 0 }}"
+          then:
+            - sequence: !input repeat_actions
+              continue_on_error: true
+  - sequence: !input stop_actions
+    continue_on_error: true
+  - choose:
+      - conditions: "{{ expand(selected_alerts) | selectattr('state', 'eq', 'off') | list | count == selected_alerts | count }}"
+        sequence: !input clear_actions
+    default: !input lost_actions
+    continue_on_error: true
+  - if: "{{ lights | count > 0 }}"
+    then:
+      - action: scene.turn_on
+        target:
+          entity_id: "{{ 'scene.' ~ scene_id }}"
+        continue_on_error: true
+      - action: scene.delete
+        target:
+          entity_id: "{{ 'scene.' ~ scene_id }}"
+mode: single
+max_exceeded: silent

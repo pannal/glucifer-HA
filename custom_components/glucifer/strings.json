@@ -44,5 +44,73 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "connection_status": {
+        "name": "Connection status",
+        "state": {
+          "waiting_for_first_snapshot": "Waiting for first snapshot",
+          "sender_timeout": "Sender has not contacted HA",
+          "snapshot_stale": "Snapshot is stale",
+          "glucose_stale": "Glucose is stale",
+          "current": "Current",
+          "fields_disabled": "Alerts disabled",
+          "alert_state_unknown": "Some alert states are unknown"
+        }
+      },
+      "alert_status": {
+        "name": "Alert data status",
+        "state": {
+          "waiting_for_first_snapshot": "Waiting for first snapshot",
+          "sender_timeout": "Sender has not contacted HA",
+          "snapshot_stale": "Snapshot is stale",
+          "glucose_stale": "Glucose is stale",
+          "current": "Current",
+          "fields_disabled": "Alerts disabled",
+          "alert_state_unknown": "Some alert states are unknown"
+        }
+      },
+      "snapshot_age": {
+        "name": "Snapshot age"
+      },
+      "observed_interval": {
+        "name": "Observed reading interval"
+      },
+      "background_interval": {
+        "name": "Background sending interval"
+      }
+    },
+    "binary_sensor": {
+      "test_alert": {
+        "name": "Test alert"
+      }
+    },
+    "button": {
+      "test_fired": {
+        "name": "Start test alert"
+      },
+      "test_acknowledged": {
+        "name": "Acknowledge test alert"
+      },
+      "test_connection_lost": {
+        "name": "Test connection loss"
+      }
+    },
+    "event": {
+      "alert_activity": {
+        "name": "Alert activity",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "fired": "Fired",
+              "acknowledged": "Acknowledged",
+              "snoozed": "Snoozed",
+              "cleared": "Cleared"
+            }
+          }
+        }
+      }
+    }
   }
 }

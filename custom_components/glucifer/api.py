@@ -69,6 +69,7 @@ def history(hass, connection, msg):
     connection.send_result(
         msg["id"],
         {
+            "alert_history": coordinator.alert_history,
             "readings": coordinator.merge_history(coordinator.history, []),
             "predictions": (coordinator.data or {}).get("predictions", []),
             "journal": retained_entries(coordinator.journal, coordinator.now_ms),

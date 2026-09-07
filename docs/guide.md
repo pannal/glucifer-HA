@@ -556,3 +556,111 @@ The horizon and model settings come from NG. Hover a curve to see its name, time
 and projected value. These are model projections, separate from stored glucose
 readings. The card hides them when their baseline is over ten minutes old.
 Journal saves can change the curves immediately, without waiting for new glucose.
+
+## Alert automation sessions
+
+For lights or sound that should stop after phone acknowledgement, import
+[Glucifer alert start and stop](../blueprints/automation/alert_session.yaml).
+Select all alerts that share those outputs in one automation. Configure Start
+and Cleanup actions, then optionally add Repeat actions, an interval, and lights
+to restore. HA's action editor lets you choose devices, entities or an area such
+as the bedroom. Quiet hours are disabled by default in this blueprint.
+
+The session continues while any selected alert is on. Once none is on, Cleanup
+runs. If every selected alert is explicitly off, the Acknowledged or cleared
+actions run next; otherwise the Connection-loss actions run. An unavailable
+alert is never treated as acknowledgement. Recovered active alerts can start a
+new session. Repeated sounds stop waiting immediately when no alert remains on.
+Keep action sequences short; long delays or loops inside your own actions delay
+cleanup. Use Repeat actions for repeated sounds.
+
+Optional light restoration captures their state once at session start, then
+restores it after cleanup. Use one automation for outputs shared by several
+alerts to avoid competing light snapshots. HA reloads/restarts discard temporary
+scene snapshots and running actions. After a restart, an alert that is still on
+can start a new session, but the original pre-restart light state is not restored.
+
+The older Alert actions and Stale data actions blueprints keep their existing
+activation-only behavior, quiet hours and cooldown settings. Importing the new
+blueprint does not replace your existing automations.
+
+## Alert reasons and timeline
+
+With the updated NG sender, each alert boolean has `reason`, `changed_at_ms`,
+and `snoozed_until_ms` attributes while available. Reasons are:
+
+| Reason | What NG reported |
+| --- | --- |
+| `fired` | An actual production alert fired. |
+| `acknowledged` | The user acknowledged the alert. |
+| `snoozed` | NG accepted a snooze, with its deadline. |
+| `cleared` | NG reset an active episode or first evaluated it as inactive. |
+
+These describe the last reported action. A past snooze deadline does not imply
+that NG fired again. `cleared` can also result from an active window ending;
+it does not establish a particular glucose condition.
+
+**Alert activity** is a native HA event entity with the alert name, reason,
+phone event timestamp and stable event ID. Its HA state timestamp is reception
+time; `time_ms` is when the event happened on the phone. A buffered event may
+arrive later. Use the booleans for current-state actions, and the event entity
+when you need a particular reported reason.
+
+Enable **Show alert history** in the card editor for a collapsible timeline.
+**Alert history entries** selects 1 to 100 rows, default 20. HA retains at most
+256 received events for seven days, separately from glucose and journal data.
+Duplicates and reloads do not replay events. NG sends the latest 32 changes in
+its current process, preserving quick fire/acknowledge pairs that share a data
+push. This is a bounded activity history, not a complete alert archive.
+
+Existing senders still work; they provide booleans without reasons. Install the
+NG build with lifecycle metadata and Glucifer HA 0.7.0 for the timeline.
+
+## Understanding connection status
+
+The device's diagnostic entities distinguish the following conditions:
+
+| Status | Meaning |
+| --- | --- |
+| Waiting for first snapshot | This receiver has not accepted initial data. |
+| Sender has not contacted HA | No accepted request within the configured stale interval. |
+| Snapshot is stale | Recent contact exists, but the live snapshot is too old. History or journal traffic can cause this. |
+| Glucose is stale | The snapshot is current, but its glucose measurement is old. |
+| Some alert states are unknown | NG included an alert without a known boolean. |
+| Alerts disabled | No alerts are selected in the current snapshot. |
+
+**Alert data status** also has an `alerts` attribute with a reason for each
+previously seen alert, including `field_disabled` and `alert_state_unknown`.
+HA removes extra attributes from unavailable entities, so use this diagnostic
+to investigate an unavailable alert. Unloading the integration makes its
+entities unavailable; a stopped integration cannot publish its own diagnosis.
+
+**Snapshot age** measures the age of the latest live snapshot. **Reading age**
+measures the glucose timestamp. **Background sending interval** comes from NG;
+`live_events_bypass_interval` is available on the status entities. An old sender
+leaves that reporting information unknown. The interval is a fallback, not a
+heartbeat: unchanged data is still skipped.
+
+**Observed reading interval** is the median of the last eight positive gaps
+between live glucose timestamps, available after three gaps. Gaps over fifteen
+minutes, duplicate timestamps and history backfill are excluded. This estimate
+can include missed readings; it is not a sensor specification and does not
+change the configured stale threshold.
+
+## Test an automation without a real alert
+
+1. Include this receiver's **Test alert** sensor in the new session blueprint's
+   selected alerts. Set the actions you want to exercise.
+2. On the Glucifer device page, press **Start test alert**. Its separate sensor
+   turns on, allowing that automation to run the configured actions.
+3. Press **Acknowledge test alert**. The test sensor turns off and cleanup runs,
+   provided no other selected alert remains on.
+4. Start another test and press **Test connection loss** to check the separate
+   connection-loss path.
+
+Active and disconnected tests reset after 60 seconds. The **Glucifer: Test alert
+automation** action also offers snooze/clear phases and a reset duration from
+1 to 300 seconds. Tests reset on integration reload and do not survive restart.
+They never send commands to NG, change production alert booleans, refresh contact
+or measurement timestamps, or add glucose, journal or production alert history.
+The selected automation can operate real lights and speakers during the test.

@@ -69,6 +69,9 @@ def validate_snapshot(payload: object, now_ms: int) -> dict:
             raise InvalidSnapshot("invalid_battery")
     if any(value is not None and type(value) is not bool for value in alerts.values()):
         raise InvalidSnapshot("invalid_alert")
+    from .alerts import validate_alert_metadata
+
+    metadata = validate_alert_metadata(payload, sent, alerts)
     predictions = validate_predictions(payload.get("predictions", []), measured)
     return deepcopy(
         {
@@ -79,6 +82,7 @@ def validate_snapshot(payload: object, now_ms: int) -> dict:
             "glucose": {"time_ms": measured, "mgdl": value},
             "fields": fields,
             "alerts": alerts,
+            **metadata,
             **({"predictions": predictions} if "predictions" in payload else {}),
         }
     )

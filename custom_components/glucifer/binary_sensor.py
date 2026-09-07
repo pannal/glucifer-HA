@@ -14,6 +14,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     known = set()
     async_add_entities(
         [
+            JugglucoTest(coordinator, "test_alert", "Test alert"),
             JugglucoHealth(coordinator, "connected", "Connected"),
             JugglucoHealth(coordinator, "stale", "Glucose stale"),
             JugglucoWarmup(coordinator, "sensor_warmup", "Sensor warming up"),
@@ -49,6 +50,40 @@ class JugglucoAlert(JugglucoEntity, BinarySensorEntity):
         if self.coordinator.data is None:
             return None
         return self.coordinator.data["alerts"].get(self.alert_key)
+
+    @property
+    def extra_state_attributes(self):
+        data = self.coordinator.data or {}
+        detail = data.get("alert_details", {}).get(self.alert_key, {})
+        return {
+            "availability_reason": self.coordinator.availability_reason(alert=self.alert_key),
+            "reason": detail.get("reason"),
+            "changed_at_ms": detail.get("time_ms"),
+            "snoozed_until_ms": detail.get("snoozed_until_ms"),
+        }
+
+
+class JugglucoTest(JugglucoEntity, BinarySensorEntity):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_icon = "mdi:test-tube"
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self._attr_translation_key = "test_alert"
+        del self._attr_name
+
+    @property
+    def available(self):
+        return self.coordinator.test_state != "unavailable"
+
+    @property
+    def is_on(self):
+        return self.coordinator.test_state == "on"
+
+    @property
+    def extra_state_attributes(self):
+        return {"test": True, "reason": self.coordinator.test_reason}
 
 
 class JugglucoHealth(JugglucoEntity, BinarySensorEntity):

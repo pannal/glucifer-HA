@@ -393,6 +393,29 @@ const path = require('node:path');
     }
     await page.setViewportSize({width:800,height:1000});
   }
+  // Optional alert history preserves rapid transitions, localizes reasons and uses safe text.
+  await page.evaluate(()=>{
+    const card=document.querySelector('glucifer-card');
+    card.setConfig({entity:'sensor.phone_glucose',show_alert_history:true,alert_history_limit:2,locale:'de-DE'});
+    card.data.alert_history=[
+      {id:'old',alert:'high',reason:'fired',time_ms:Date.now()-10000},
+      {id:'ack',alert:'high',reason:'acknowledged',time_ms:Date.now()-2000},
+      {id:'snooze',alert:'high',reason:'snoozed',time_ms:Date.now()-1000,snoozed_until_ms:Date.now()+600000}
+    ];
+    card.render();
+  });
+  assert.equal(await root.locator('.alert-history').getAttribute('hidden'),null);
+  await root.locator('.alert-history summary').click();
+  assert.equal(await root.locator('.alert-history summary').textContent(),'Alarmverlauf');
+  assert.equal(await root.locator('.alert-history-list > div').count(),2);
+  assert.match(await root.locator('.alert-history-list').textContent(),/Bestätigt/);
+  assert.match(await root.locator('.alert-history-list').textContent(),/\d{2}:\d{2}:\d{2}/);
+  assert.match(await root.locator('.alert-history-list > div').first().textContent(),/Stummgeschaltet bis/);
+  await page.evaluate(()=>{
+    const card=document.querySelector('glucifer-card');
+    card.setConfig({entity:'sensor.phone_glucose',show_alert_history:false});
+  });
+  assert.notEqual(await root.locator('.alert-history').getAttribute('hidden'),null);
   // An entity change during an outstanding request must fetch the new entity.
   await page.evaluate(()=>{
     const card=document.querySelector('glucifer-card');

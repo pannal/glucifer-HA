@@ -95,6 +95,11 @@ and German labels, dates and numbers, including `E` for insulin units. Fonts com
 
 <img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-inline-journal.png?v=drop-anchor" alt="German Glucifer card with a Notiz entry expanded in place in the Tagebuch list" width="400">
 
+**Alert history** keeps quick fire/acknowledge pairs visible, with localized dates
+and reasons. Enable it and choose an entry limit in the visual editor.
+
+<img src="https://raw.githubusercontent.com/pannal/glucifer-ha/main/docs/screenshots/dashboard-alert-history.png?v=0.7.0" alt="German Glucifer card with an expanded alarm timeline showing firing and acknowledgement eight seconds apart" width="400">
+
 These options are available in the card's visual editor.
 
 </details>
@@ -184,9 +189,16 @@ and only change what the card displays. Sensor dates follow your HA profile’s
 date, time, and time-zone preferences. Disabled or
 unknown fields become unavailable, never an invented zero or false value.
 Alerts reflect JugglucoNG's active episodes as `on` or `off`; stale alerts
-become unavailable. The default stale interval is five minutes.
+become unavailable. **Alert data status** explains why. Updated NG senders also
+provide acknowledgement/snooze reasons and an optional card timeline. The default stale interval is five minutes.
 
-Import [Alert actions](blueprints/automation/alert_actions.yaml) or
+For lights and sound that stop on acknowledgement, import
+[Alert start and stop](blueprints/automation/alert_session.yaml). It supports
+multiple alerts, repeat actions, connection-loss actions and light restoration.
+Use the separate **Test alert** sensor and device buttons to test the automation.
+[Setup and behavior](docs/guide.md#alert-automation-sessions)
+
+You can also import the earlier [Alert actions](blueprints/automation/alert_actions.yaml) and
 [Stale data actions](blueprints/automation/stale_actions.yaml) under
 **Settings > Automations & scenes > Blueprints > Import blueprint**, using
 the file's GitHub URL. Both support quiet hours and a cooldown.

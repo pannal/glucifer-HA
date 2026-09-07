@@ -1,0 +1,38 @@
+test_alert:
+  name: Test alert automation
+  description: >-
+    Change only this receiver's Test alert sensor. Does not send commands to NG or
+    affect real alerts, contact times, glucose or journal history. Active and
+    disconnected tests reset automatically after the selected duration.
+  fields:
+    config_entry_id:
+      name: Receiver
+      required: true
+      selector:
+        config_entry:
+          integration: glucifer
+    phase:
+      name: Test event
+      required: true
+      selector:
+        select:
+          options:
+            - label: Fire test alert
+              value: fired
+            - label: Acknowledge test alert
+              value: acknowledged
+            - label: Snooze test alert
+              value: snoozed
+            - label: Clear test alert
+              value: cleared
+            - label: Simulate connection loss
+              value: connection_lost
+    duration_seconds:
+      name: Automatic reset after
+      default: 60
+      selector:
+        number:
+          min: 1
+          max: 300
+          unit_of_measurement: s
+          mode: slider
